@@ -1,0 +1,11 @@
+flowchart LR
+  S((Inicio)) --> T02["T02 User Task: consultar portal"] --> G2{D02: ¿autorizado para reservar?}
+  G2 -- No --> A["T04: autenticar / aplicar permiso"] --> G2
+  G2 -- Sí --> T07["T07 User Task: consultar especialidades"] --> G3{D03: ¿especialidad activa?}
+  G3 -- No --> E0((Fin: no reservable))
+  G3 -- Sí --> T08["T08 User Task: consultar disponibilidad"] --> G4{D04: ¿hay cupo elegible?}
+  G4 -- No --> W((Salida a BPMN-04))
+  G4 -- Sí --> RV["T11 Service Task: revalidar slot en transacción"] --> G6{D06: ¿slot sigue libre?}
+  G6 -- No --> X["Conflicto controlado; sin cita"] --> T08
+  G6 -- Sí --> CR["T11 Service Task: crear Appointment SCHEDULED; flowStage null"] --> T12["T12 Service Task: emitir constancia"] --> E1((Fin: reserva creada))
+  CR -. AuditLog en transacción si acción crítica .-> AU["T27 transversal"]

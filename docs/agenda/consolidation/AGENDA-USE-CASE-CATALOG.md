@@ -1,0 +1,28 @@
+# Catálogo de casos de uso — Agenda Availability + Specialty Policy
+
+## Propósito y alcance
+
+Consolidar los ocho identificadores locales `CU-D1`–`CU-D8` del caso académico HOSPITALPLATFORM. Este catálogo indexa el [diagrama D.1](../uml/AGENDA-AVAILABILITY-USE-CASE-DIAGRAM.puml), las [fichas D.2](../use-cases/AGENDA-AVAILABILITY-USE-CASE-DETAILS.md) y los escenarios D.3.1–D.3.3. No crea casos nuevos ni confiere aprobación institucional al Hospital de Huaycán.
+
+**Estados del caso:** `IMPLEMENTADO` = comportamiento vigente delimitado por Java/API y pruebas; `PARCIAL` = existe un subconjunto del RF; `CONCEPTUAL` = intención/decisión documental sin flujo Java/API. En CU-D3 está aprobado el **propietario**, no el CRUD. Un esquema SQL o una decisión `CLOSED` no convierte un caso en implementado.
+
+## Actores del incremento
+
+`ADMIN`, `PATIENT` y `RECEPTIONIST` participan en las operaciones indicadas abajo. `PROFESSIONAL` es un rol real, pero no inicia ninguno de estos ocho casos; sus operaciones de atención pertenecen a otro alcance de Appointments. `SYSTEM` técnico ejecuta la invariante CU-D8 dentro de CU-D7; no es un rol humano ni un endpoint.
+
+## Catálogo completo
+
+| Caso y objetivo | Estado | RF | Actor | Módulo responsable | Evidencia y escenario | Dependencias y límite |
+|---|---|---|---|---|---|---|
+| **CU-D1 — Gestión profesional:** crear, consultar y actualizar perfil básico | **PARCIAL** | RF-007 | ADMIN actual | Professionals | `ProfessionalController`/`ProfessionalService`, V1 `professionals`, `ProfessionalServiceTest`; [escenario](../scenarios/CU-D1-PROFESSIONAL-MANAGEMENT-PARTIAL-SCENARIO.puml) | Licencia obligatoria y `userId` opcional en alta; PUT cambia solo licencia. Asociación N:M es CU-D2; ciclo de vínculo User–Professional DEC-005 `OPEN`; desactivación HTTP ausente. |
+| **CU-D2 — Asociación Professional–Specialty:** gestionar relación N:M | **CONCEPTUAL** | RF-007 | ADMIN conceptual | Professionals posee asociación; Catalogs posee definición | DEC-006 y V1 `professional_specialties` como soporte físico; [escenario](../scenarios/CU-D2-PROFESSIONAL-SPECIALTY-CONCEPTUAL-SCENARIO.puml). Sin prueba funcional. | DEC-006 cierra ownership/cardinalidad, no gestión Java. Consulta de Catalogs, reglas de elegibilidad y contrato de asociación pendientes. |
+| **CU-D3 — Gestión Specialty Catalog:** mantener definiciones | **CONCEPTUAL** | RF-008 | ADMIN conceptual | Catalogs | DEC-006 fija ownership; V1 `specialties` solo esquema; [escenario](../scenarios/CU-D3-SPECIALTY-CATALOG-CONCEPTUAL-SCENARIO.puml). Sin CRUD/test Java. | Consulta/creación/edición/estado son objetivo RF-008, no API vigente. Semántica `active`/`deleted_at` y bootstrap DEC-003 pendientes. |
+| **CU-D4 — Configuración Schedule:** crear, consultar, actualizar y cambiar `active` | **PARCIAL** | RF-011 | ADMIN actual | Agenda | `AgendaController`/`AgendaService`, `ProfessionalLookupService`, V1 `schedules`, `AgendaServiceTest`; [escenario](../scenarios/CU-D4-SCHEDULE-CONFIGURATION-PARTIAL-SCENARIO.puml) | Valida profesional activo y rango; FK valida existencia de specialty, no actividad/asociación. No genera slots; DEC-008/010 `OPEN`. |
+| **CU-D5 — Consulta disponibilidad ADMIN:** leer slots operativos existentes | **IMPLEMENTADO** para ADMIN | RF-012, porción ADMIN | ADMIN actual | Agenda | Dos GET ADMIN, `AgendaService.findAvailability`, `AvailabilitySlotResponseDTO`, V1; [escenario](../scenarios/CU-D5-ADMIN-AVAILABILITY-SCENARIO.puml) y pruebas de servicio/controller/autorización | La lista puede incluir `RESERVED`/`BLOCKED`; `usable` es derivado. No es la vista sanitizada CU-D6 ni reserva. RF-012 completo sigue parcial. |
+| **CU-D6 — Consulta disponibilidad sanitizada:** descubrir oferta minimizada | **CONCEPTUAL** | RF-012, porción futura | PATIENT y RECEPTIONIST conceptuales | Agenda, vista futura separada | DEC-007 aprueba actores/exposición; [escenario](../scenarios/CU-D6-SANITIZED-AVAILABILITY-CONCEPTUAL-SCENARIO.puml). Sin API/test de vista. | Filtros, campos, permiso y contrato definitivos pendientes. CU-D7 no exige consulta previa; DEC-010 `OPEN`. |
+| **CU-D7 — Reserva de cita:** reservar slot usable y crear cita | **IMPLEMENTADO** para RF-013 actual | RF-013 | PATIENT propio; ADMIN/RECEPTIONIST para paciente activo | Appointments coordina Patients, Agenda y Professionals | `AppointmentController`/`AppointmentService`, `AvailabilitySlotReservationService`, V1/V3, `AppointmentModuleIT`; [escenario](../scenarios/CU-D7-APPOINTMENT-RESERVATION-SCENARIO.puml) | Revalidación/reserva atómica; contexto profesional/especialidad derivado del slot. No requiere CU-D6 ni aplica ventanas DEC-010. |
+| **CU-D8 — Control de concurrencia de reserva:** impedir doble asignación | **IMPLEMENTADO** como invariante interna | RF-014 | SYSTEM técnico; solicitudes humanas heredan CU-D7 | Agenda + Appointments | UPDATE condicional, índice parcial V3, `AppointmentModuleIT` con 2 solicitudes y `AppointmentPersistenceIT`; [escenario](../scenarios/CU-D8-CONCURRENT-RESERVATION-SCENARIO.puml) | No es endpoint ni caso humano independiente. Ensayo SRS de 20 solicitudes sigue **PENDIENTE**. |
+
+## Lectura del estado
+
+El estado de **CU-D5** no eleva todo RF-012 a implementado: CU-D6 continúa conceptual. El estado de **CU-D8** acredita la exclusión mutua actual, pero no el criterio de carga de 20 solicitudes de la SRS. `CONCEPTUAL` en CU-D2/D3/D6 no significa permiso efectivo. El [registro de decisiones](../../DOMAIN-DECISION-REGISTER.md) gobierna el estado vigente de DEC-005/006/007/008/010; el [baseline](../../DOMAIN-BASELINE.md) y la [matriz C.1](../AGENDA-AVAILABILITY-RF-UC-MATRIX.md) respaldan la clasificación funcional.

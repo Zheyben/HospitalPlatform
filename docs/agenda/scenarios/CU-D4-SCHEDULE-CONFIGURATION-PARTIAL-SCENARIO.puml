@@ -1,0 +1,133 @@
+@startuml
+title CU-D4 - Configuracion de horarios - escenario PARCIAL
+hide footbox
+autonumber
+
+actor "ADMIN" as Admin
+boundary "AgendaController\n/api/v1/agendas" as Controller
+control "AgendaService" as Service
+control "ProfessionalLookupService" as ProfessionalLookup
+database "ScheduleRepository\nschedules (V1)" as Repository
+
+note over Admin, Repository
+  PARCIAL (RF-011): configuracion y lectura de Schedule por ADMIN.
+  Cada bloque es una peticion independiente. No crea availability_slots.
+end note
+
+== Crear horario - IMPLEMENTADO ==
+Admin -> Controller: POST /agendas\nCreateAgendaRequestDTO(professionalId, specialtyId,\ndayOfWeek, startTime, endTime)
+note right of Controller
+  Autenticacion + hasRole('ADMIN') + @Valid.
+  Campos @NotNull; dayOfWeek @Min(0) @Max(6).
+end note
+Controller -> Service: createAgenda(request)
+Service -> ProfessionalLookup: existsActiveProfessional(professionalId)
+alt profesional ausente o inactivo
+  ProfessionalLookup --> Service: false
+  Service --> Controller: ProfessionalNotAvailableException
+  Controller --> Admin: 404 PROFESSIONAL_NOT_AVAILABLE
+else profesional activo
+  ProfessionalLookup --> Service: true
+  Service -> Service: endTime.isAfter(startTime)
+  alt rango invalido
+    Service --> Controller: InvalidScheduleTimeException
+    Controller --> Admin: 400 INVALID_SCHEDULE_TIME
+  else rango valido
+    Service -> Repository: save(Schedule con specialtyId UUID)
+    note right of Repository
+      V1: FK specialty_id verifica existencia fisica;
+      CHECK de dia 0..6 y end_time > start_time.
+    end note
+    alt FK specialty_id invalida identificada por handler
+      Repository --> Controller: DataIntegrityViolationException
+      Controller --> Admin: 400 INVALID_SPECIALTY_REFERENCE
+    else guardado
+      Repository --> Service: Schedule persistido
+      Service --> Controller: AgendaResponseDTO(id, professionalId, specialtyId,\ndayOfWeek, startTime, endTime, active)
+      Controller --> Admin: 201 Created + Location + DTO
+    end
+  end
+end
+
+== Consultar horarios - IMPLEMENTADO ==
+Admin -> Controller: GET /agendas\n(filtros opcionales professionalId, specialtyId)
+Controller -> Service: findAgendas(professionalId?, specialtyId?)
+Service -> Repository: findSchedules(professionalId?, specialtyId?)
+Repository --> Service: schedules
+Service --> Controller: List<AgendaResponseDTO>
+Controller --> Admin: 200 lista
+
+Admin -> Controller: GET /agendas/{id}
+Controller -> Service: findAgendaById(id)
+Service -> Repository: findById(id)
+alt agenda ausente
+  Repository --> Service: empty
+  Service --> Controller: AgendaNotFoundException
+  Controller --> Admin: 404 AGENDA_NOT_FOUND
+else encontrada
+  Repository --> Service: Schedule
+  Service --> Controller: AgendaResponseDTO
+  Controller --> Admin: 200 DTO
+end
+
+== Actualizar configuracion - IMPLEMENTADO ==
+Admin -> Controller: PUT /agendas/{id}\nUpdateAgendaRequestDTO(professionalId, specialtyId,\ndayOfWeek, startTime, endTime)
+note right of Controller: @Valid; mismas restricciones DTO que POST
+Controller -> Service: updateAgenda(id, request)
+Service -> Repository: findById(id)
+alt agenda ausente
+  Repository --> Service: empty
+  Service --> Controller: AgendaNotFoundException
+  Controller --> Admin: 404 AGENDA_NOT_FOUND
+else encontrada
+  Repository --> Service: Schedule
+  Service -> ProfessionalLookup: existsActiveProfessional(professionalId)
+  alt profesional ausente o inactivo
+    ProfessionalLookup --> Service: false
+    Service --> Controller: ProfessionalNotAvailableException
+    Controller --> Admin: 404 PROFESSIONAL_NOT_AVAILABLE
+  else profesional activo
+    ProfessionalLookup --> Service: true
+    Service -> Service: endTime.isAfter(startTime)
+    alt rango invalido
+      Service --> Controller: InvalidScheduleTimeException
+      Controller --> Admin: 400 INVALID_SCHEDULE_TIME
+    else rango valido
+      Service -> Service: schedule.updateConfiguration(...)
+      note right of Service: Entidad gestionada en transaccion; V1 aplica FK/CHECK
+      alt FK specialty_id invalida identificada por handler
+        Service --> Controller: DataIntegrityViolationException
+        Controller --> Admin: 400 INVALID_SPECIALTY_REFERENCE
+      else actualizacion aceptada
+        Service --> Controller: AgendaResponseDTO
+        Controller --> Admin: 200 DTO
+      end
+    end
+  end
+end
+
+== Cambiar active del horario - IMPLEMENTADO ==
+Admin -> Controller: PATCH /agendas/{id}/status\nUpdateAgendaStatusRequestDTO(active)
+Controller -> Service: changeAgendaStatus(id, active)
+Service -> Repository: findById(id)
+alt agenda ausente
+  Repository --> Service: empty
+  Service --> Controller: AgendaNotFoundException
+  Controller --> Admin: 404 AGENDA_NOT_FOUND
+else encontrada
+  Repository --> Service: Schedule
+  Service -> Service: schedule.changeStatus(active)
+  Service --> Controller: AgendaResponseDTO
+  Controller --> Admin: 200 DTO
+end
+
+note over Admin, Repository
+  PENDIENTE / NO IMPLEMENTADO: comprobar specialty activa/no eliminada
+  y asociacion profesional-especialidad N:M (DEC-006: ownership conceptual).
+  PENDIENTE / NO IMPLEMENTADO: generacion de slots, duracion, calendario,
+  horizonte y solapamiento (DEC-008 OPEN).
+  PENDIENTE / NO IMPLEMENTADO: zona horaria aplicada y ventanas/restricciones
+  temporales; no-show no es estado actual (DEC-010 OPEN; DEC-011 FUTURE).
+  No hay algoritmo, endpoint, llamada ni flujo de estas capacidades aqui.
+end note
+@enduml

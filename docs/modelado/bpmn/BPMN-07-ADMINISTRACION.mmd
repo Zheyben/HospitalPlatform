@@ -1,0 +1,8 @@
+flowchart LR
+  S((Inicio administrativo)) --> T01["T01 User Task: preparar contenido"] --> G1{D01: ¿fuente autorizada?}
+  G1 -- No --> E0((Fin: no publicar))
+  G1 -- Sí --> PUB((Contenido publicable))
+  S --> T05["T05 User Task: mantener profesionales y especialidades"] --> T06["T06 User Task: configurar agenda y slots"] --> A((Catálogo y cupos disponibles))
+  X((Evento crítico de otros procesos)) --> T27["T27 Service Task transversal: AuditLog en misma transacción"]
+  Q((Solicitud autorizada de indicador)) --> T28["T28 User/Service Task: calcular indicador o no medible"] --> E1((Fin: resultado trazable))
+  U((Usuario de interfaz)) --> T29["T29 User Task transversal: preferencia visual accesible"] --> E2((Fin: interfaz legible sin depender de color))

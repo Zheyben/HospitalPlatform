@@ -1,0 +1,7 @@
+flowchart LR
+  S((Inicio: solicitud opcional)) --> G5{D05: ¿política aprobada y solicitud?}
+  G5 -- No --> E0((Fin: reserva estándar))
+  G5 -- Sí --> T09["T09 User Task: solicitar revisión"] --> T10["T10 User Task: revisor autorizado evalúa"] --> GD{D05: ¿aprobar o rechazar manualmente?}
+  GD -- Aprobar --> A["Registrar APPROVED, motivo y actor"] --> E1((Fin: decisión manual))
+  GD -- Rechazar --> R["Registrar REJECTED, motivo y actor"] --> E1
+  T10 -. T27 AuditLog en transacción .-> AU["Auditoría transversal"]

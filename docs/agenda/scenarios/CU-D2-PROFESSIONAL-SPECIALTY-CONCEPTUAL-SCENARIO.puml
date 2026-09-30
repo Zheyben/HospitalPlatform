@@ -1,0 +1,40 @@
+@startuml
+title CU-D2 - Asociacion Professional - Specialty
+hide footbox
+skinparam shadowing false
+
+actor ADMIN
+box "HospitalPlatform - limite del sistema" #E7EEF7
+  participant "Interaccion de dominio\nCONCEPTUAL" as Sistema
+end box
+
+note over ADMIN, Sistema
+  CONCEPTUAL — NO IMPLEMENTADO
+  Objetivo: gestionar la relacion N:M entre profesionales y especialidades.
+  DEC-006 aprueba cardinalidad y ownership para el caso academico:
+  Professionals gestiona asociaciones; Catalogs posee definiciones.
+  La secuencia ilustra una intencion, no una UI, API ni proceso ejecutable.
+end note
+
+ADMIN -> Sistema: Seleccionar profesional para una asociacion [conceptual]
+ADMIN -> Sistema: Consultar especialidades disponibles [conceptual]
+note right of Sistema
+  Fuente de consulta y criterio de disponibilidad: PENDIENTES.
+  No existe consulta funcional de Catalogs.
+end note
+Sistema --> ADMIN: Opciones conceptuales; contenido por definir
+ADMIN -> Sistema: Indicar especialidad a asociar [conceptual]
+Sistema -> Sistema: Validacion conceptual de la relacion
+note right of Sistema
+  Identidad, elegibilidad, estado de especialidad,
+  duplicado y tratamiento de errores: PENDIENTES.
+  Ninguna validacion de este paso existe en Java.
+end note
+Sistema --> ADMIN: Resultado conceptual; forma y reglas por definir
+
+note over ADMIN, Sistema
+  V1 tiene professional_specialties con PK/FK: soporte fisico solamente.
+  NO IMPLEMENTADO: gestion N:M, consulta de Catalogs, contrato, permiso y prueba.
+  No se especifican endpoint, DTO, controller, servicio ni persistencia operativa.
+end note
+@enduml

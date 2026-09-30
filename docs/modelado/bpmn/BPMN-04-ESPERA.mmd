@@ -1,0 +1,12 @@
+flowchart LR
+  S((Inicio: sin disponibilidad)) --> T19["T19 User Task: crear/consultar/cancelar WaitlistEntry ACTIVE"] --> WE((Espera de liberación elegible))
+  L((Evento: slot liberado)) --> G10{D10: ¿entrada elegible?}
+  G10 -- No --> EV((Fin: slot disponible según política))
+  G10 -- Sí --> T20["T20 Service Task: crear SlotOffer PENDING"] --> G11{D11: ¿respuesta válida?}
+  G11 -- Rechazo --> RJ["SlotOffer REJECTED; sin cita"] --> NX((Siguiente según política))
+  G11 -- Expiración según política --> EX["SlotOffer EXPIRED; sin cita"] --> NX
+  G11 -- Aceptación vigente --> T21["T21 User/Service Task: aceptar y revalidar slot atómicamente"] --> G6{D06: ¿slot disponible?}
+  G6 -- No --> CF((Conflicto; sin adjudicación))
+  G6 -- Sí --> AP["SlotOffer ACCEPTED + una Appointment SCHEDULED"] --> EC((Fin: nueva cita))
+  WE -. Entrada elegible cuando existe liberación .-> G10
+  T20 -. Aviso T13; entrega no implica lectura .-> G11

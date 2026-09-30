@@ -1,0 +1,46 @@
+# ==============================
+# IDEs
+# ==============================
+.idea/
+*.iml
+.vscode/
+
+# ==============================
+# Java / Maven
+# ==============================
+**/target/
+*.log
+
+# ==============================
+# Environment / secrets
+# ==============================
+.env
+.env.*
+!.env.example
+
+# ==============================
+# Operating systems
+# ==============================
+.DS_Store
+Thumbs.db
+
+# ==============================
+# Temporary files
+# ==============================
+*.tmp
+*.temp
+*.swp
+
+# Microsoft Office temporary lock files
+~$*.docx
+~$*.pptx
+~$*.xlsx
+
+# ==============================
+# Local academic references
+# Keep bibliography/source files local.
+# Generated deliverables are NOT ignored.
+# ==============================
+docs/references/**/*.pdf
+docs/references/**/*.pptx
+docs/references/**/*.docx

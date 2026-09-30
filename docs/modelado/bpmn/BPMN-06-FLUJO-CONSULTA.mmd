@@ -1,0 +1,10 @@
+flowchart LR
+  S((Inicio)) --> T22["T22 User Task: consultar agenda autorizada"] --> G12{D12: ¿cita CONFIRMED?}
+  G12 -- No --> E0((Fin: check-in rechazado))
+  G12 -- Sí --> G13{D13: ¿actor, propiedad y transición válidos?}
+  G13 -- No --> EC((Conflicto 409 o acceso denegado))
+  G13 -- Sí --> T23["T23 Receptionist: CHECK_IN"] --> T24["T24 Receptionist: WAITING"] --> T25["T25 Professional titular: IN_ATTENTION"] --> T26["T26 Professional titular: FINISHED + COMPLETED"] --> E1((Fin: slot RESERVED consumido))
+  T23 -. Cada transición: validar y auditar atómicamente; repetición actual idempotente .-> AU["T27 transversal"]
+  T24 -. Mismo control .-> AU
+  T25 -. Mismo control .-> AU
+  T26 -. Mismo control .-> AU

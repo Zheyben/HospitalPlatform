@@ -1,0 +1,23 @@
+flowchart LR
+  A1["A1 Identidad y acceso<br/>T03-T04"] --> A2["A2 Contenido, catálogo y agenda<br/>T01-T02, T05-T08"]
+  A2 --> A3["A3 Ciclo de cita y comunicaciones<br/>T11-T18, T14"]
+  A3 --> A4["A4 Espera, oferta y prioridad<br/>T09-T10, T19-T21"]
+  A4 --> A3
+  A3 --> A5["A5 Flujo operativo<br/>T22-T26"]
+  A1 --> A6["A6 Trazabilidad, indicadores y accesibilidad<br/>T27-T29"]
+  A2 --> A6
+  A3 --> A6
+  A4 --> A6
+  A5 --> A6
+  C["Controles C1-C4 de A-0"] -. condicionan .-> A1
+  C -. condicionan .-> A2
+  C -. condicionan .-> A3
+  C -. condicionan .-> A4
+  C -. condicionan .-> A5
+  C -. condicionan .-> A6
+  M["Mecanismos M1-M2 de A-0"] -. habilitan .-> A1
+  M -. habilitan .-> A2
+  M -. habilitan .-> A3
+  M -. habilitan .-> A4
+  M -. habilitan .-> A5
+  M -. habilitan .-> A6

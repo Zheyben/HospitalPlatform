@@ -1,0 +1,44 @@
+@startuml
+title CU-D3 - Gestion Specialty Catalog
+hide footbox
+skinparam shadowing false
+
+actor ADMIN
+box "HospitalPlatform - limite del sistema" #E7EEF7
+  participant "Interaccion de dominio\nCONCEPTUAL" as Sistema
+end box
+
+note over ADMIN, Sistema
+  CONCEPTUAL — NO IMPLEMENTADO
+  Objetivo: administrar definiciones de especialidades.
+  DEC-006 asigna la propiedad de definiciones a Catalogs;
+  no aprueba un CRUD ejecutable ni una politica de estado.
+  Los bloques son alternativas independientes, no un ciclo obligatorio.
+end note
+
+== Consultar definiciones - conceptual ==
+ADMIN -> Sistema: Solicitar consulta del catalogo [conceptual]
+Sistema --> ADMIN: Definiciones visibles; alcance pendiente
+
+== Crear definicion - conceptual ==
+ADMIN -> Sistema: Proponer nueva especialidad [conceptual]
+Sistema -> Sistema: Evaluar datos conforme a politica pendiente
+Sistema --> ADMIN: Resultado conceptual; forma por definir
+
+== Actualizar definicion - conceptual ==
+ADMIN -> Sistema: Proponer cambio de definicion [conceptual]
+Sistema -> Sistema: Evaluar editabilidad conforme a politica pendiente
+Sistema --> ADMIN: Resultado conceptual; forma por definir
+
+== Estado activo/inactivo - conceptual ==
+ADMIN -> Sistema: Proponer cambio de estado [conceptual]
+Sistema -> Sistema: Evaluar efecto conforme a politica pendiente
+Sistema --> ADMIN: Resultado conceptual; forma por definir
+
+note over ADMIN, Sistema
+  V1 contiene specialties con active y deleted_at; no hay CRUD Java.
+  Semantica conjunta de esos campos y efecto sobre agendas, slots y citas:
+  PENDIENTES. La SRS menciona code; V1 no tiene esa columna.
+  NO IMPLEMENTADO: endpoints, DTO, permisos, contratos y pruebas de Catalogs.
+end note
+@enduml

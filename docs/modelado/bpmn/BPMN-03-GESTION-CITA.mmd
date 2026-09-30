@@ -1,0 +1,17 @@
+flowchart LR
+  S((Inicio: cita SCHEDULED)) --> T14["T14 User Task: consultar cita propia"] --> G7{D07: ¿confirma asistencia?}
+  G7 -- Sí --> T15["T15 User Task: confirmar; CONFIRMED"] --> EC((Fin: apta para check-in))
+  G7 -- No o aún no --> G8{D08: ¿cancelación o reprogramación permitida?}
+  G8 -- Ninguna --> EP((Fin: estado conservado))
+  G8 -- Cancelar --> T16["T16 User Task: cancelar; CANCELLED"] --> G9{D09: ¿slot liberable?}
+  G8 -- Reprogramar --> T17["T17 User/Service Task: validar nuevo slot y cambiar atómicamente"] --> GR{D06: ¿nuevo slot reservado?}
+  GR -- No --> EF((Fin: cita original intacta))
+  GR -- Sí --> NS["Original RESCHEDULED; sucesora SCHEDULED"] --> G9
+  G9 -- Sí --> T18["T18 Service Task: liberar slot anterior"] --> W((Señal a BPMN-04))
+  G9 -- No --> EN((Fin: slot no liberado))
+  T16 -. AuditLog misma transacción .-> AU["T27 transversal"]
+  T17 -. AuditLog misma transacción .-> AU
+  T15 -. Evento persistido habilita aviso .-> T13["T13 Service Task: aviso configurable"]
+  T16 -. Evento persistido habilita aviso .-> T13
+  NS -. Evento persistido habilita aviso .-> T13
+  T13 --> EA((Aviso enviado o fallo registrado; cita intacta))

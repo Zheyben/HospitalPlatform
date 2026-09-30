@@ -1,0 +1,15 @@
+flowchart LR
+  I1["I1 Solicitudes y datos mínimos"] --> A["A-0<br/>Gestionar citas médicas y trazabilidad de consulta externa programada"]
+  I2["I2 Selección de especialidad y acciones sobre cita"] --> A
+  I3["I3 Respuestas a ofertas, prioridad y consulta"] --> A
+  C1["C1 SRS y RB"] --> A
+  C2["C2 Permisos y estados aprobados"] --> A
+  C3["C3 Políticas institucionales validadas, cuando existan"] --> A
+  C4["C4 Seguridad, privacidad y contenido autorizado"] --> A
+  M1["M1 Paciente y personal autorizado"] --> A
+  M2["M2 HospitalPlatform: backend, PostgreSQL, web, app"] --> A
+  A --> O1["O1 Cuenta, sesión y vistas autorizadas"]
+  A --> O2["O2 Cita, constancia y estado actualizado"]
+  A --> O3["O3 Entrada de espera, oferta y decisión de prioridad"]
+  A --> O4["O4 Flujo operativo, auditoría e indicadores"]
+  A --> O5["O5 Contenido y disponibilidad publicados"]

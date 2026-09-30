@@ -1,0 +1,48 @@
+@startuml
+title CU-D6 - Consulta de disponibilidad sanitizada
+hide footbox
+skinparam shadowing false
+
+actor PATIENT
+actor RECEPTIONIST
+box "HospitalPlatform - limite del sistema" #E7EEF7
+  participant "Interaccion de disponibilidad\nCONCEPTUAL" as Sistema
+end box
+
+note over PATIENT, Sistema
+  CONCEPTUAL — NO IMPLEMENTADO
+  Objetivo: descubrir disponibilidad para una posible reserva sin exponer
+  informacion operativa interna. DEC-007 aprueba PATIENT y RECEPTIONIST
+  autenticados; la consulta para esos roles no existe en API/Java.
+end note
+
+alt actor PATIENT
+  PATIENT -> Sistema: Acreditar autenticacion [precondicion conceptual]
+  PATIENT -> Sistema: Solicitar disponibilidad [conceptual]
+  Sistema -> Sistema: Aplicar filtros permitidos [por definir]
+  Sistema -> Sistema: Minimizar exposicion de datos [criterio conceptual]
+  Sistema --> PATIENT: Respuesta sanitizada conceptual
+else actor RECEPTIONIST
+  RECEPTIONIST -> Sistema: Acreditar autenticacion [precondicion conceptual]
+  RECEPTIONIST -> Sistema: Solicitar disponibilidad [conceptual]
+  Sistema -> Sistema: Aplicar filtros permitidos [por definir]
+  Sistema -> Sistema: Minimizar exposicion de datos [criterio conceptual]
+  Sistema --> RECEPTIONIST: Respuesta sanitizada conceptual
+end
+
+note right of Sistema
+  Filtros, combinaciones, periodo y reglas de especialidad:
+  PENDIENTES. No se presume una regla temporal ni consulta actual.
+end note
+note right of Sistema
+  Contenido sanitizado exacto y diferenciacion por rol:
+  PENDIENTES. Sin campos ni DTO definitivos.
+end note
+
+note over PATIENT, Sistema
+  Solo intencion de lectura: no reserva ni garantiza disponibilidad posterior.
+  La vista ADMIN implementada (CU-D5) permanece separada.
+  NO IMPLEMENTADO: endpoint, permiso de consulta, contrato, filtro o prueba.
+  La reserva vigente (CU-D7) no exige esta consulta previa.
+end note
+@enduml

@@ -1,0 +1,83 @@
+@startuml
+title HospitalPlatform - Agenda Availability + Specialty Policy
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor<<IMPLEMENTADO>> #E7F2EA
+  BorderColor<<IMPLEMENTADO>> #35734B
+  BackgroundColor<<PARCIAL>> #FFF2D9
+  BorderColor<<PARCIAL>> #9A701E
+  BackgroundColor<<CONCEPTUAL>> #E7EEF7
+  BorderColor<<CONCEPTUAL>> #446A96
+}
+
+actor ADMIN as Admin
+actor PATIENT as Patient
+actor RECEPTIONIST as Receptionist
+
+rectangle "HospitalPlatform\nAgenda Availability + Specialty Policy" {
+  package "Gestion profesional - RF-007 parcial" {
+    usecase "Crear profesional" as UC_CreateProfessional <<PARCIAL>>
+    usecase "Consultar profesional" as UC_ReadProfessional <<PARCIAL>>
+    usecase "Actualizar profesional" as UC_UpdateProfessional <<PARCIAL>>
+  }
+
+  package "Agenda y disponibilidad actuales" {
+    usecase "Gestionar horario profesional" as UC_ManageSchedule <<PARCIAL>>
+    usecase "Consultar disponibilidad operativa" as UC_AdminAvailability <<IMPLEMENTADO>>
+  }
+
+  package "Citas - reserva actual" {
+    usecase "Solicitar cita medica" as UC_RequestAppointment <<IMPLEMENTADO>>
+    usecase "Reservar slot disponible" as UC_ReserveSlot <<IMPLEMENTADO>>
+    usecase "Validar disponibilidad atomica" as UC_AtomicAvailability <<IMPLEMENTADO>>
+  }
+
+  package "Diseno aprobado - NO IMPLEMENTADO" {
+    usecase "Administrar definicion de especialidad" as UC_ManageSpecialty <<CONCEPTUAL>>
+    usecase "Asociar profesional con especialidad" as UC_AssignSpecialty <<CONCEPTUAL>>
+    usecase "Consultar disponibilidad para reserva" as UC_SanitizedAvailability <<CONCEPTUAL>>
+  }
+}
+
+Admin --> UC_CreateProfessional
+Admin --> UC_ReadProfessional
+Admin --> UC_UpdateProfessional
+Admin --> UC_ManageSchedule
+Admin --> UC_AdminAvailability
+Admin --> UC_ManageSpecialty
+Admin --> UC_AssignSpecialty
+
+Patient --> UC_SanitizedAvailability
+Receptionist --> UC_SanitizedAvailability
+
+Patient --> UC_RequestAppointment
+Receptionist --> UC_RequestAppointment
+Admin --> UC_RequestAppointment
+
+UC_RequestAppointment ..> UC_ReserveSlot : <<include>>
+UC_ReserveSlot ..> UC_AtomicAvailability : <<include>>
+
+note right of UC_ManageSchedule
+  Solo gestion de Schedule existente.
+  Sin generacion automatica de slots.
+end note
+
+note right of UC_SanitizedAvailability
+  DEC-007: actores aprobados conceptualmente.
+  Sin endpoint, DTO ni permiso efectivo.
+end note
+
+note bottom of UC_AtomicAvailability
+  UPDATE condicional + indice parcial V3.
+  RF-014: prueba con 2 solicitudes;
+  escenario SRS de 20 pendiente.
+end note
+
+legend bottom
+  <<IMPLEMENTADO>>  Comportamiento actual verificado
+  <<PARCIAL>>       Alcance RF solo parcialmente implementado
+  <<CONCEPTUAL>>    Aprobado en diseno, sin flujo Java/API
+endlegend
+@enduml

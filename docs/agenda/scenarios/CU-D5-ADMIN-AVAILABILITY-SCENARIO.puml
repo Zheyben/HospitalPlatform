@@ -1,0 +1,56 @@
+@startuml
+title CU-D5 - Consulta operativa de disponibilidad (ADMIN)
+autonumber
+actor ADMIN
+participant "Seguridad Spring\nSecurityFilterChain + @PreAuthorize" as Security
+participant AgendaController as Controller
+participant AgendaService as Service
+participant AvailabilitySlotRepository as Repository
+database PostgreSQL as DB
+participant AgendaMapper as Mapper
+
+ADMIN -> Security: GET /api/v1/availability[/{id}]
+alt sin autenticacion
+  Security --> ADMIN: 401 Unauthorized
+else autenticado sin rol ADMIN
+  Security --> ADMIN: 403 Forbidden
+else ADMIN autorizado
+  Security -> Controller: invocar endpoint
+  alt listado, filtros opcionales
+    Controller -> Service: findAvailability(scheduleId, professionalId, slotDate, status)
+    Service -> Repository: findAvailability(...)
+    Repository -> DB: SELECT slots JOIN schedules
+    DB --> Repository: cero o mas slots
+    Repository --> Service: List<AvailabilitySlot>
+    Service -> Mapper: toAvailabilityResponseList(slots)
+    note right of Mapper
+      usable = AVAILABLE && schedule.active
+      No excluye automaticamente RESERVED/BLOCKED.
+    end note
+    Mapper --> Service: List<AvailabilitySlotResponseDTO>
+    Service --> Controller: lista (puede ser vacia)
+    Controller --> ADMIN: 200 OK + lista
+  else detalle por UUID
+    Controller -> Service: findAvailabilitySlotById(id)
+    Service -> Repository: findById(id)
+    Repository -> DB: SELECT slot
+    DB --> Repository: slot o ausencia
+    alt slot existe
+      Repository --> Service: AvailabilitySlot
+      Service -> Mapper: toAvailabilityResponse(slot)
+      Mapper --> Service: AvailabilitySlotResponseDTO
+      Service --> Controller: DTO
+      Controller --> ADMIN: 200 OK + DTO
+    else slot no existe
+      Repository --> Service: Optional.empty
+      Service --> Controller: AvailabilitySlotNotFoundException
+      Controller --> ADMIN: 404 AVAILABILITY_SLOT_NOT_FOUND
+    end
+  end
+end
+
+note over Controller,DB
+  Consulta de solo lectura; no reserva ni crea slots.
+  No existe filtro specialtyId en este GET.
+end note
+@enduml

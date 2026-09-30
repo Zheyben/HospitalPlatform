@@ -1,0 +1,44 @@
+@startuml
+title CU-D8 - Exclusion atomica de doble reserva (invariante de CU-D7)
+autonumber
+participant "CU-D7 / transaccion A" as TxA
+participant "CU-D7 / transaccion B" as TxB
+participant "AvailabilitySlotReservationService\n+ implementacion Agenda" as Reservation
+participant AvailabilitySlotRepository as SlotRepository
+database PostgreSQL as DB
+
+note over TxA,TxB
+  Intercalacion ilustrativa con A ganadora.
+  No es una nueva operacion de usuario ni un endpoint propio.
+end note
+
+TxA -> Reservation: reserveUsableSlot(mismo slotId)
+Reservation -> SlotRepository: reserveUsableSlot(slotId), A
+SlotRepository -> DB: UPDATE condicional A\nstatus = AVAILABLE AND schedule.active
+DB --> SlotRepository: 1 fila; bloqueo hasta fin de TxA
+SlotRepository --> Reservation: 1
+Reservation -> SlotRepository: findByIdWithSchedule(slotId)
+SlotRepository -> DB: SELECT slot + schedule
+DB --> SlotRepository: slot y schedule
+SlotRepository --> Reservation: AvailabilitySlot
+Reservation --> TxA: AvailabilitySlotReference
+TxB -> Reservation: reserveUsableSlot(mismo slotId)
+Reservation -> SlotRepository: reserveUsableSlot(slotId), B
+SlotRepository -> DB: UPDATE condicional B sobre misma fila
+note right of DB
+  B puede esperar por la fila de A.
+  El test actual no mide esa espera.
+end note
+TxA -> DB: INSERT cita SCHEDULED
+TxA -> DB: COMMIT
+DB --> SlotRepository: B reevalua condicion; 0 filas
+SlotRepository --> Reservation: 0
+Reservation --> TxB: SlotReservationRejectedException
+note right of TxB: CU-D7 traduce a 409 SLOT_UNAVAILABLE
+
+note over Reservation,DB
+  V3: uq_appointments_active_slot protege unicidad de
+  citas SCHEDULED/CONFIRMED por slot_id.
+  No se usa PESSIMISTIC_WRITE en la creacion actual.
+end note
+@enduml

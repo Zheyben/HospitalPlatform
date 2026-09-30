@@ -1,0 +1,7 @@
+flowchart LR
+  S((Inicio)) --> G{D02: ¿sesión y permiso válidos?}
+  G -- No, puede registrarse --> T03["T03 User Task: registrar paciente y perfil"] --> T04["T04 User/Service Task: autenticar y autorizar"]
+  G -- Sí --> OK((Acceso permitido))
+  T04 --> G
+  G -- No autorizado --> E((Fin: acceso denegado))
+  T04 -. Renovación/cierre de sesión y control por recurso .-> T04

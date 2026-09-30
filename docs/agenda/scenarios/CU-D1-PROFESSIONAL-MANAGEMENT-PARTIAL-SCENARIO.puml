@@ -1,0 +1,90 @@
+@startuml
+title CU-D1 - Gestion profesional - escenario PARCIAL
+hide footbox
+autonumber
+
+actor "ADMIN" as Admin
+boundary "ProfessionalController\n/api/v1/professionals" as Controller
+control "ProfessionalService" as Service
+database "ProfessionalRepository\nprofessionals (V1)" as Repository
+
+note over Admin, Repository
+  PARCIAL (RF-007): solo las operaciones HTTP actuales de ADMIN.
+  Cada bloque representa una peticion independiente, no una secuencia obligatoria.
+end note
+
+== Crear profesional - IMPLEMENTADO ==
+Admin -> Controller: POST /professionals\nCreateProfessionalRequestDTO(userId?, licenseNumber)
+note right of Controller: Autenticacion + hasRole('ADMIN') + @Valid
+Controller -> Service: createProfessional(request)
+Service -> Service: trim(licenseNumber)
+Service -> Repository: existsByLicenseNumberIgnoreCase(licenseNumber)
+alt licencia duplicada
+  Repository --> Service: true
+  Service --> Controller: DuplicateProfessionalException
+  Controller --> Admin: 409 DUPLICATE_PROFESSIONAL
+else licencia disponible
+  Repository --> Service: false
+  Service -> Repository: save(Professional(userId?, licenseNumber))
+  note right of Repository
+    V1: user_id nullable, UNIQUE y FK a users.
+    Solo integridad fisica; sin ciclo de vinculacion.
+  end note
+  Repository --> Service: Professional persistido
+  Service --> Controller: ProfessionalResponseDTO(id, userId, licenseNumber, active)
+  Controller --> Admin: 201 Created + Location + DTO
+end
+
+== Consultar profesional - IMPLEMENTADO ==
+Admin -> Controller: GET /professionals
+Controller -> Service: findProfessionals()
+Service -> Repository: findAllByDeletedAtIsNullOrderByCreatedAtDesc()
+Repository --> Service: profesionales vigentes
+Service --> Controller: List<ProfessionalResponseDTO>
+Controller --> Admin: 200 lista
+
+Admin -> Controller: GET /professionals/{id}
+Controller -> Service: findProfessionalById(id)
+Service -> Repository: findByIdAndDeletedAtIsNull(id)
+alt no existe o esta eliminado
+  Repository --> Service: empty
+  Service --> Controller: ProfessionalNotFoundException
+  Controller --> Admin: 404 PROFESSIONAL_NOT_FOUND
+else vigente
+  Repository --> Service: Professional
+  Service --> Controller: ProfessionalResponseDTO
+  Controller --> Admin: 200 DTO
+end
+
+== Actualizar profesional - IMPLEMENTADO ==
+Admin -> Controller: PUT /professionals/{id}\nUpdateProfessionalRequestDTO(licenseNumber)
+note right of Controller: @Valid; el DTO no contiene userId ni specialtyId
+Controller -> Service: updateProfessional(id, request)
+Service -> Repository: findByIdAndDeletedAtIsNull(id)
+alt no existe o esta eliminado
+  Repository --> Service: empty
+  Service --> Controller: ProfessionalNotFoundException
+  Controller --> Admin: 404 PROFESSIONAL_NOT_FOUND
+else vigente
+  Repository --> Service: Professional
+  Service -> Service: trim(licenseNumber); comprobar duplicado ajeno si cambia
+  alt licencia duplicada
+    Service --> Controller: DuplicateProfessionalException
+    Controller --> Admin: 409 DUPLICATE_PROFESSIONAL
+  else licencia aceptada
+    Service -> Service: professional.updateBasicInfo(licenseNumber)
+    note right of Service: Entidad gestionada en transaccion; cambia solo la licencia
+    Service --> Controller: ProfessionalResponseDTO
+    Controller --> Admin: 200 DTO
+  end
+end
+
+note over Admin, Repository
+  PENDIENTE / NO IMPLEMENTADO en API: ciclo de vinculacion User-Professional
+  (DEC-005 OPEN); no se dibuja aprobacion ni sincronizacion automatica.
+  CONCEPTUAL / NO IMPLEMENTADO: asociacion N:M profesional-especialidad
+  y ownership de Professionals (DEC-006 CLOSED solo en diseno; CU-D2 separado).
+  NO IMPLEMENTADO en HTTP: desactivacion; existe metodo en el service.
+  Ninguna de estas capacidades tiene flechas de flujo en este escenario.
+end note
+@enduml

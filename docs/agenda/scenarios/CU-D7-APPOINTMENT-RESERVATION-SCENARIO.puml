@@ -1,0 +1,62 @@
+@startuml
+title CU-D7 - Reserva actual de cita medica
+autonumber
+actor "PATIENT / ADMIN / RECEPTIONIST" as Actor
+participant "Seguridad Spring\nSecurityFilterChain + @PreAuthorize" as Security
+participant AppointmentController as Controller
+participant AppointmentService as Service
+participant CurrentUserService as CurrentUser
+participant PatientLookupService as PatientLookup
+participant "AvailabilitySlotReservationService\n+ implementacion Agenda" as Reservation
+participant AvailabilitySlotRepository as SlotRepository
+participant ProfessionalLookupService as ProfessionalLookup
+participant AppointmentRepository as Repository
+database PostgreSQL as DB
+
+Actor -> Security: POST /api/v1/appointments\nCreateAppointmentRequestDTO
+alt anonimo o rol no autorizado
+  Security --> Actor: 401 o 403
+else rol PATIENT, ADMIN o RECEPTIONIST
+  Security -> Controller: invocar createAppointment(request)
+  Controller -> Service: createAppointment(request)
+  note right of Service: @Transactional: una transaccion de negocio
+  alt patientId explicito (ADMIN/RECEPTIONIST)
+    Service -> PatientLookup: existsActivePatient(patientId)
+    PatientLookup --> Service: true
+  else patientId omitido (PATIENT)
+    Service -> CurrentUser: currentUserId()
+    CurrentUser --> Service: userId
+    Service -> PatientLookup: findActivePatientReferenceByUserId(userId)
+    PatientLookup --> Service: referencia activa
+  end
+  Service -> Reservation: reserveUsableSlot(slotId)
+  Reservation -> SlotRepository: reserveUsableSlot(slotId)
+  SlotRepository -> DB: UPDATE availability_slots\nAVAILABLE -> RESERVED si schedule.active
+  DB --> SlotRepository: 1 fila actualizada
+  SlotRepository --> Reservation: 1
+  Reservation -> SlotRepository: findByIdWithSchedule(slotId)
+  SlotRepository -> DB: SELECT slot + schedule
+  DB --> SlotRepository: slot y schedule
+  SlotRepository --> Reservation: AvailabilitySlot
+  Reservation --> Service: AvailabilitySlotReference
+  Service -> ProfessionalLookup: existsActiveProfessional(professionalId)
+  ProfessionalLookup --> Service: true
+  Service -> Repository: saveAndFlush(Appointment)
+  note right of Repository
+    AppointmentStatus = SCHEDULED
+    FlowStage = null
+  end note
+  Repository -> DB: INSERT appointments
+  DB --> Repository: cita persistida
+  Repository --> Service: Appointment
+  note right of Service: commit al retornar por el proxy transaccional
+  Service --> Controller: AppointmentResponseDTO
+  Controller --> Actor: 201 Created + DTO + Location
+end
+
+note over Service,DB
+  Sin llamada previa obligatoria a consulta de disponibilidad.
+  Sin evento de auditoria de creacion en este metodo.
+  Fallo despues del UPDATE: rollback de la reserva y la cita.
+end note
+@enduml

@@ -1,0 +1,17 @@
+flowchart LR
+  %% Convención editable de flujo BPMN; Mermaid no es BPMN 2.0 ejecutable.
+  S((Inicio)) --> P["Consulta pública<br/>T02"] --> I["Identidad y acceso<br/>BPMN-01"]
+  I --> C["Catálogo y disponibilidad<br/>T07-T08"] --> G{D04: ¿cupo elegible?}
+  G -- Sí --> R["Reserva atómica<br/>BPMN-02"] --> K["Constancia SCHEDULED<br/>T12"]
+  G -- No --> W["Espera y oferta<br/>BPMN-04"]
+  W -- Oferta aceptada y slot revalidado --> R
+  W -- Rechazo, expiración o salida --> EW((Fin sin cita))
+  C -. Solicitud opcional .-> Q["Prioridad manual<br/>BPMN-05"] -. Decisión registrada .-> C
+  K --> M["Gestión de cita<br/>BPMN-03"]
+  M -- Cancelación --> EC((Fin: CANCELLED))
+  M -- Reprogramación --> R
+  M -- Confirmación --> F["Flujo de consulta<br/>BPMN-06"] --> EF((Fin: FINISHED y COMPLETED))
+  M -- Cita SCHEDULED pendiente --> EP((Fin de instancia actual))
+  A["Administración, auditoría e indicadores<br/>BPMN-07"] -. Habilita catálogo, agenda y controles .-> C
+  A -. Auditoría transversal .-> R
+  A -. Auditoría transversal .-> F

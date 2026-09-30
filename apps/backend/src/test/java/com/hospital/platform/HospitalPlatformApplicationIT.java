@@ -1,0 +1,229 @@
+package com.hospital.platform;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.hospital.platform.agenda.contract.AvailabilitySlotService;
+import java.util.List;
+import java.util.UUID;
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
+@SpringBootTest
+@ActiveProfiles("test")
+@Testcontainers
+@AutoConfigureMockMvc
+class HospitalPlatformApplicationIT {
+
+    private static final UUID PROFESSIONAL_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
+    private static final UUID SPECIALTY_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
+    private static final UUID INVALID_SPECIALTY_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
+    private static final UUID ACTIVE_SCHEDULE_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID INACTIVE_SCHEDULE_ID = UUID.fromString("11111111-1111-1111-1111-111111111112");
+    private static final UUID AVAILABLE_ACTIVE_SLOT_ID = UUID.fromString("22222222-2222-2222-2222-222222222221");
+    private static final UUID AVAILABLE_INACTIVE_SLOT_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final UUID RESERVED_ACTIVE_SLOT_ID = UUID.fromString("22222222-2222-2222-2222-222222222223");
+    private static final UUID BLOCKED_ACTIVE_SLOT_ID = UUID.fromString("22222222-2222-2222-2222-222222222224");
+
+    @Container
+    static final PostgreSQLContainer postgres = new PostgreSQLContainer(
+            DockerImageName.parse("postgres:16-alpine"))
+            .withDatabaseName("hospital_platform_test")
+            .withUsername("hospital_app_test")
+            .withPassword("hospital_app_test");
+
+    @DynamicPropertySource
+    static void databaseProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+    }
+
+    @Autowired
+    private Flyway flyway;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private AvailabilitySlotService availabilitySlotService;
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @BeforeEach
+    void setUpAgendaData() {
+        jdbcTemplate.update("delete from availability_slots where schedule_id in (?, ?)",
+                ACTIVE_SCHEDULE_ID, INACTIVE_SCHEDULE_ID);
+        jdbcTemplate.update("delete from schedules where id in (?, ?)",
+                ACTIVE_SCHEDULE_ID, INACTIVE_SCHEDULE_ID);
+        jdbcTemplate.update("delete from professionals where id = ?", PROFESSIONAL_ID);
+        jdbcTemplate.update("delete from specialties where id = ?", SPECIALTY_ID);
+
+        jdbcTemplate.update(
+                "insert into specialties (id, name) values (?, ?)",
+                SPECIALTY_ID,
+                "Cardiology Test"
+        );
+        jdbcTemplate.update(
+                "insert into professionals (id, license_number) values (?, ?)",
+                PROFESSIONAL_ID,
+                "CMP-TEST-001"
+        );
+        jdbcTemplate.update(
+                "insert into schedules "
+                        + "(id, professional_id, specialty_id, day_of_week, start_time, end_time, active) "
+                        + "values (?, ?, ?, 1, time '09:00', time '12:00', true)",
+                ACTIVE_SCHEDULE_ID,
+                PROFESSIONAL_ID,
+                SPECIALTY_ID
+        );
+        jdbcTemplate.update(
+                "insert into schedules "
+                        + "(id, professional_id, specialty_id, day_of_week, start_time, end_time, active) "
+                        + "values (?, ?, ?, 1, time '09:00', time '12:00', false)",
+                INACTIVE_SCHEDULE_ID,
+                PROFESSIONAL_ID,
+                SPECIALTY_ID
+        );
+
+        insertSlot(AVAILABLE_ACTIVE_SLOT_ID, ACTIVE_SCHEDULE_ID, "09:00", "AVAILABLE");
+        insertSlot(AVAILABLE_INACTIVE_SLOT_ID, INACTIVE_SCHEDULE_ID, "09:00", "AVAILABLE");
+        insertSlot(RESERVED_ACTIVE_SLOT_ID, ACTIVE_SCHEDULE_ID, "10:00", "RESERVED");
+        insertSlot(BLOCKED_ACTIVE_SLOT_ID, ACTIVE_SCHEDULE_ID, "11:00", "BLOCKED");
+    }
+
+    @Test
+    void contextLoadsAndAppliesMigrationsThroughRefreshTokens() {
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("3");
+
+        Integer rolesTableCount = jdbcTemplate.queryForObject(
+                "select count(*) from information_schema.tables "
+                        + "where table_schema = 'public' and table_name = 'roles'",
+                Integer.class);
+        Integer refreshTokensTableCount = jdbcTemplate.queryForObject(
+                "select count(*) from information_schema.tables "
+                        + "where table_schema = 'public' and table_name = 'refresh_tokens'",
+                Integer.class);
+
+        assertThat(rolesTableCount).isEqualTo(1);
+        assertThat(refreshTokensTableCount).isEqualTo(1);
+    }
+
+    @Test
+    void reportsAvailableSlotWithActiveScheduleAsUsable() {
+        assertThat(availabilitySlotService.isUsable(AVAILABLE_ACTIVE_SLOT_ID)).isTrue();
+    }
+
+    @Test
+    void reportsAvailableSlotWithInactiveScheduleAsNotUsable() {
+        assertThat(availabilitySlotService.isUsable(AVAILABLE_INACTIVE_SLOT_ID)).isFalse();
+    }
+
+    @Test
+    void reportsReservedSlotWithActiveScheduleAsNotUsable() {
+        assertThat(availabilitySlotService.isUsable(RESERVED_ACTIVE_SLOT_ID)).isFalse();
+    }
+
+    @Test
+    void reportsBlockedSlotWithActiveScheduleAsNotUsable() {
+        assertThat(availabilitySlotService.isUsable(BLOCKED_ACTIVE_SLOT_ID)).isFalse();
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void returnsControlledErrorForInvalidSpecialtyReference() throws Exception {
+        String request = """
+                {
+                  "professionalId": "%s",
+                  "specialtyId": "%s",
+                  "dayOfWeek": 1,
+                  "startTime": "09:00:00",
+                  "endTime": "12:00:00"
+                }
+                """.formatted(PROFESSIONAL_ID, INVALID_SPECIALTY_ID);
+
+        mockMvc.perform(post("/agendas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Specialty reference is invalid"))
+                .andExpect(jsonPath("$.errorCode").value("INVALID_SPECIALTY_REFERENCE"));
+    }
+
+    @Test
+    @WithMockUser(roles = "PROFESSIONAL")
+    void returnsForbiddenForUnauthorizedRoleOnEveryAgendaEndpoint() throws Exception {
+        for (MockHttpServletRequestBuilder request : agendaRequests()) {
+            mockMvc.perform(request).andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void requiresAuthenticationOnEveryAgendaEndpoint() throws Exception {
+        for (MockHttpServletRequestBuilder request : agendaRequests()) {
+            mockMvc.perform(request).andExpect(status().isUnauthorized());
+        }
+    }
+
+    private void insertSlot(UUID slotId, UUID scheduleId, String startTime, String status) {
+        jdbcTemplate.update(
+                "insert into availability_slots "
+                        + "(id, schedule_id, slot_date, start_time, end_time, status) "
+                        + "values (?, ?, date '2026-10-01', cast(? as time), cast(? as time) + interval '30 minutes', ?)",
+                slotId,
+                scheduleId,
+                startTime,
+                startTime,
+                status
+        );
+    }
+
+    private List<MockHttpServletRequestBuilder> agendaRequests() {
+        String agendaRequest = """
+                {
+                  "professionalId": "%s",
+                  "specialtyId": "%s",
+                  "dayOfWeek": 1,
+                  "startTime": "09:00:00",
+                  "endTime": "12:00:00"
+                }
+                """.formatted(PROFESSIONAL_ID, SPECIALTY_ID);
+
+        return List.of(
+                post("/agendas").contentType(MediaType.APPLICATION_JSON).content(agendaRequest),
+                get("/agendas"),
+                get("/agendas/{id}", ACTIVE_SCHEDULE_ID),
+                put("/agendas/{id}", ACTIVE_SCHEDULE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(agendaRequest),
+                patch("/agendas/{id}/status", ACTIVE_SCHEDULE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"active\":false}"),
+                get("/availability"),
+                get("/availability/{id}", AVAILABLE_ACTIVE_SLOT_ID)
+        );
+    }
+}
