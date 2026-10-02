@@ -13,7 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.hospital.platform.appointments.dto.AppointmentResponseDTO;
 import com.hospital.platform.appointments.entity.AppointmentStatus;
 import com.hospital.platform.appointments.entity.FlowStage;
-import com.hospital.platform.appointments.exception.AppointmentSlotReleaseException;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.hospital.platform.appointments.exception.AppointmentSuccessorExistsException;
 import com.hospital.platform.appointments.exception.AppointmentExceptionHandler;
 import com.hospital.platform.appointments.exception.AppointmentNotFoundException;
@@ -175,7 +175,7 @@ class AppointmentControllerTest {
                         "confirmed"
                 ));
         when(appointmentService.cancelAppointment(APPOINTMENT_ID))
-                .thenThrow(new AppointmentSlotReleaseException(SLOT_ID, new IllegalStateException("rejected")));
+                .thenThrow(new DataIntegrityViolationException("Capacity conflict"));
         when(appointmentService.rescheduleAppointment(APPOINTMENT_ID, NEW_SLOT_ID))
                 .thenThrow(new AppointmentSuccessorExistsException(APPOINTMENT_ID));
 
@@ -184,7 +184,7 @@ class AppointmentControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("INVALID_APPOINTMENT_TRANSITION"));
         mockMvc.perform(post("/appointments/{id}/cancel", APPOINTMENT_ID))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("APPOINTMENT_SLOT_RELEASE_FAILED"));
+                .andExpect(jsonPath("$.errorCode").value("APPOINTMENT_CAPACITY_CONFLICT"));
         mockMvc.perform(post("/appointments/{id}/reschedule", APPOINTMENT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"slotId\":\"" + NEW_SLOT_ID + "\"}"))

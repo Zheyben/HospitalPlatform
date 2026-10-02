@@ -1,0 +1,36 @@
+@startuml
+title Patrón DAO / Repository mediante Spring Data JPA
+hide footbox
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontColor #123B52
+skinparam ArrowColor #1E5A78
+skinparam participantBackgroundColor #E9F3F7
+skinparam participantBorderColor #1E5A78
+skinparam sequenceMessageAlign center
+
+participant "AppointmentController\nHTTP y DTO" as Controller
+participant "AppointmentService\nnegocio y @Transactional" as Service
+participant "AppointmentRepository\ninterface JpaRepository" as Repository
+participant "Spring Data JPA\nHibernate ORM" as ORM
+database "PostgreSQL 16\npersistencia" as DB
+
+Controller -> Service : findAppointments()
+Service -> Repository : findAllByPatientIdOrderByCreatedAtDesc(patientId)
+Repository -> ORM : consulta derivada de Spring Data
+ORM -> DB : JDBC / SQL
+DB --> ORM : filas
+ORM --> Repository : entidades Appointment
+Repository --> Service : List<Appointment>
+Service --> Controller : List<AppointmentResponseDTO>
+
+note over Repository
+  Otros ejemplos reales: PatientRepository,
+  AvailabilitySlotRepository y UserRepository.
+end note
+note over Repository, ORM
+  Repository cumple la responsabilidad de acceso
+  a datos equivalente al patrón DAO.
+end note
+@enduml

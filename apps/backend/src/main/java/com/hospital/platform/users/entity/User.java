@@ -32,6 +32,12 @@ public class User {
     @Column(name = "password_hash", nullable = false, columnDefinition = "TEXT")
     private String passwordHash;
 
+    @Column(name = "first_name", length = 100)
+    private String firstName;
+
+    @Column(name = "last_name", length = 100)
+    private String lastName;
+
     @Column(nullable = false)
     private boolean enabled = true;
 
@@ -88,6 +94,12 @@ public class User {
         touch();
     }
 
+    public void setNames(String firstName, String lastName) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+        touch();
+    }
+
     public void changeStatus(boolean enabled) {
         this.enabled = enabled;
         touch();
@@ -113,6 +125,14 @@ public class User {
 
     public String getPasswordHash() {
         return passwordHash;
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
     }
 
     public boolean isEnabled() {

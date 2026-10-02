@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital de Huaycán - Portal de Salud</title>
+    <link rel="stylesheet" href="../Estilos/Estilos.css">
+</head>
+<body>
+    <!-- NUEVA BARRA DE NAVEGACIÓN PÚBLICA -->
+    <header class="navbar-new">
+        <div class="logo-container">
+            <img src="../Imagenes/hospital-de-huaycan-logo.jpg" alt="Logo" class="logo-img">
+            <span class="brand-name">Hospital de Huaycán</span>
+        </div>
+        
+        <nav class="nav-links-new">
+            <a href="#">Atención médica</a>
+            <a href="#especialidades">Especialidades</a>
+            <a href="#profesionales">Para profesionales</a>
+            <a href="#investigacion">Investigación y educación</a>
+        </nav>
+        
+        <div class="nav-actions-new">
+            <a href="http://127.0.0.1:3000/register" class="btn-text">Pedir una cita</a>
+            <a href="http://127.0.0.1:3000/login" class="login-link">
+                Iniciar sesión
+            </a>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- SECCIÓN PRINCIPAL (HERO) -->
+        <section class="hero-section">
+            <div class="hero-text" style="flex: 1.3; padding-right: 3rem;">
+                <h1 style="margin-bottom: 1.5rem; font-size: 3.2rem;">Te cuidamos, te curamos.</h1>
+                <p style="font-size: 1.05rem; color: var(--text-gray); margin-bottom: 1rem; line-height: 1.6; text-align: left;">
+                    Bienvenido al portal público del Hospital de Huaycán. Como institución líder en el sector salud, nuestro principal objetivo es brindarte una atención médica de calidad, accesible y humana. A través de nuestra plataforma, cuidamos tu salud y gestionamos tus citas para que siempre estés en buenas manos. Nos enorgullece ser un pilar fundamental en el bienestar integral de toda la comunidad, ofreciendo servicios médicos avanzados respaldados por tecnología de vanguardia y un equipo de profesionales médicos altamente capacitados.
+                </p>
+                <p style="font-size: 1.05rem; color: var(--text-gray); margin-bottom: 1rem; line-height: 1.6; text-align: left;">
+                    Sabemos que la prevención, el diagnóstico oportuno y el seguimiento adecuado son esenciales para una vida plena. Por ello, hemos diseñado este espacio digital pensando en tu comodidad y seguridad, permitiéndote acceder a nuestro amplio directorio de especialidades, programar tus consultas médicas sin largas esperas y mantener un contacto directo con tus doctores. Contamos con diversas áreas especializadas, servicios de urgencias disponibles las 24 horas del día, los 365 días del año, y moderna infraestructura para garantizar tratamientos efectivos.
+                </p>
+                <p style="font-size: 1.05rem; color: var(--text-gray); margin-bottom: 2rem; line-height: 1.6; text-align: left;">
+                    Nuestro compromiso y vocación de servicio van mucho más allá de tratar padecimientos; buscamos promover un estilo de vida saludable y ofrecerte el acompañamiento humano necesario en cada etapa de tu recuperación. Creemos firmemente en el trato empático, la ética profesional y el respeto absoluto hacia cada paciente. Confía en nosotros y en nuestra experiencia para cuidar lo más valioso que tienes. Regístrate o inicia sesión hoy mismo y comienza a disfrutar de todos los beneficios.
+                </p>
+                <p id="profesionales" style="font-size: 1.05rem; color: var(--text-gray); margin-bottom: 1rem; line-height: 1.6; text-align: left;">
+                    <strong>Para profesionales:</strong> Ofrecemos un entorno de trabajo colaborativo y de excelencia clínica. Brindamos acceso a tecnología médica de última generación y un sistema de gestión eficiente que facilita la labor diaria. Si eres especialista, te invitamos a formar parte de nuestro prestigioso equipo y contribuir juntos al desarrollo de la medicina.
+                </p>
+                <p id="investigacion" style="font-size: 1.05rem; color: var(--text-gray); margin-bottom: 2rem; line-height: 1.6; text-align: left;">
+                    <strong>Investigación y educación:</strong> Nos consolidamos como un centro de formación continua, impulsando programas académicos y estudios clínicos que buscan innovar en los tratamientos. Creemos que la enseñanza y el aprendizaje constante son pilares inquebrantables para el avance científico y la excelencia médica del mañana.
+                </p>
+                <a href="http://127.0.0.1:3000/login" class="btn-secondary" style="text-decoration: none; display: inline-block; padding: 0.8rem 2.2rem; font-size: 1.05rem; font-weight: 600;">Ingresar al Portal</a>
+            </div>
+            <div class="hero-image-container" style="flex: 1;">
+                <img src="../Imagenes/Presentacion.png" alt="Presentacion del Hospital de Huaycán" class="big-img" style="width: 100%; height: 100%; min-height: 400px; object-fit: cover; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+            </div>
+        </section>
+
+        <!-- SECCIÓN: NUESTRAS ESPECIALIDADES -->
+        <section id="especialidades" class="specialties-section">
+            <div class="section-header">
+                <h2>Nuestras Especialidades</h2>
+                <div class="specialties-tabs">
+                </div>
+            </div>
+            <div class="specialties-grid">
+                <!-- Tarjeta 1 -->
+                <div class="specialty-card">
+                    <img src="../Imagenes/Medicina General.png" alt="Medicina General" class="specialty-img"> 
+                    <div class="specialty-content">
+                        <h3>Medicina General</h3>
+                        <p>Servicio de medicina general y atención preventiva integral para el cuidado primario.</p>
+                        <a href="#" class="btn-outline">Conoce más</a>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 2 -->
+                <div class="specialty-card">
+                    <img src="../Imagenes/Medicina Interna.jpg" alt="Medicina Interna" class="specialty-img">
+                    <div class="specialty-content">
+                        <h3>Medicina Interna</h3>
+                        <p>Atención clínica especializada para el diagnóstico y tratamiento integral en pacientes adultos.</p>
+                        <a href="#" class="btn-outline">Conoce más</a>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 3 -->
+                <div class="specialty-card">
+                    <img src="../Imagenes/Pediatra.jpeg" alt="Pediatría" class="specialty-img">
+                    <div class="specialty-content">
+                        <h3>Pediatría</h3>
+                        <p>Atención médica especializada en el desarrollo y cuidado de bebés, niños y adolescentes.</p>
+                        <a href="#" class="btn-outline">Conoce más</a>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 4 -->
+                <div class="specialty-card">
+                    <img src="../Imagenes/Gineco-obstetricia.jpg" alt="Gineco-Obstetricia" class="specialty-img">
+                    <div class="specialty-content">
+                        <h3>Gineco-Obstetricia</h3>
+                        <p>Incluye atención materno-infantil integral y realización de cirugías ginecológicas.</p>
+                        <a href="#" class="btn-outline">Conoce más</a>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 6 -->
+                <div class="specialty-card">
+                    <img src="../Imagenes/Odontologia.jpg" alt="Odontología" class="specialty-img">
+                    <div class="specialty-content">
+                        <h3>Odontología</h3>
+                        <p>Servicios preventivos y tratamientos especializados para el cuidado de la salud bucal.</p>
+                        <a href="#" class="btn-outline">Conoce más</a>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 7 -->
+                <div class="specialty-card">
+                    <img src="../Imagenes/Psicologia.webp" alt="Psicología" class="specialty-img">
+                    <div class="specialty-content">
+                        <h3>Psicología</h3>
+                        <p>Acompañamiento, evaluación y tratamiento profesional para el cuidado de la salud mental.</p>
+                        <a href="#" class="btn-outline">Conoce más</a>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 8 -->
+                <div class="specialty-card">
+                    <img src="../Imagenes/Emergencia.jpg" alt="Emergencias" class="specialty-img">
+                    <div class="specialty-content">
+                        <h3>Emergencias</h3>
+                        <p>Servicio ininterrumpido de Emergencia y área de Cuidados Críticos para situaciones de riesgo.</p>
+                        <a href="#" class="btn-outline">Conoce más</a>
+                    </div>
+                </div>
+
+
+            </div>
+        </section>
+
+        <!-- SECCIÓN: NUESTRA SEDE (Hospital de Huaycán) -->
+        <section class="location-section">
+            <div class="location-info">
+                <h2>Encuentra nuestra sede cerca de ti.</h2>
+                <div class="location-details">
+                    <h3>Hospital de Huaycán</h3>
+                    <p>Av. J.C. Mariátegui S/N, Zona "B" - Huaycán, Ate.</p>
+                    <p>Lima, Perú</p>
+                    <a href="https://maps.google.com/?q=Hospital+de+Huaycan+Ate+Peru" target="_blank" class="btn-primary" style="display: inline-block; margin-top: 15px; text-decoration: none;">
+                        📍 Ver en Google Maps
+                    </a>
+                </div>
+            </div>
+            <div class="location-image">
+                <img src="../Imagenes/Ubicacion.png" alt="Ubicación del Hospital de Huaycán" class="big-img">
+            </div>
+        </section>
+    </main>
+
+    <!-- FOOTER (Pie de página) -->
+    <footer class="site-footer">
+        <div class="footer-grid">
+            <div class="footer-col">
+                <h4>Institucional</h4>
+                <ul>
+                    <li><a href="../Docs/Derechos_de_los_Pacientes_Hospital_Huaycan.pdf" target="_blank">Derechos de los pacientes</a></li>
+                    <li><a href="quienes_somos.html">Quiénes Somos</a></li>
+                    <li><a href="acreditaciones.html">Acreditaciones</a></li>
+                    <li><a href="mailto:reclutamientos.minsa@gmail.com">Trabaja con Nosotros</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Pacientes</h4>
+                <ul>
+                    <li><a href="#especialidades">Especialidades</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Legales</h4>
+                <ul>
+                    <li><a href="../Docs/Terminos_y_condiciones.pdf" target="_blank">Términos y Condiciones (T&C)</a></li>
+                    <li><a href="../Docs/Politicas_privacidad.pdf" target="_blank">Política de Privacidad</a></li>
+                    <li><a href="#">Libro de Reclamaciones</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Hospital de Huaycán. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+</body>
+</html>

@@ -16,3 +16,7 @@ spring:
 logging:
   level:
     org.hibernate.SQL: ${HIBERNATE_SQL_LOG_LEVEL:WARN}
+
+hospital:
+  demo:
+    seed-enabled: ${DEMO_SEED_ENABLED:false}

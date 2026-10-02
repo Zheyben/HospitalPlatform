@@ -1,0 +1,95 @@
+@startuml
+title HOSPITALPLATFORM | PostgreSQL V5: seguridad y tablas auxiliares
+left to right direction
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontColor #123B52
+skinparam ArrowColor #1E5A78
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam entity {
+  BackgroundColor #F7FAFC
+  BorderColor #1E5A78
+  FontColor #123B52
+  FontSize 15
+}
+
+
+entity "permissions" as permissions {
+  id : uuid [PK]
+  name : varchar[100] [UQ]
+  description : text [NULL]
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "role_permissions" as role_permissions {
+  role_id : uuid [PK, FK>roles]
+  permission_id : uuid [PK, FK]
+}
+
+entity "refresh_tokens" as refresh_tokens {
+  id : uuid [PK]
+  user_id : uuid [FK>users]
+  token_hash : varchar[255] [UQ]
+  expires_at : timestamp
+  revoked_at : timestamp [NULL]
+  created_at : timestamp
+}
+
+entity "audit_logs" as audit_logs {
+  id : uuid [PK]
+  user_id : uuid [FK>users, NULL]
+  action : varchar[100]
+  entity_name : varchar[100]
+  entity_id : uuid [NULL]
+  old_values : jsonb [NULL]
+  new_values : jsonb [NULL]
+  ip_address : varchar[100] [NULL]
+  user_agent : text [NULL]
+  created_at : timestamp
+}
+
+entity "waitlist_entries" as waitlist_entries {
+  id : uuid [PK]
+  patient_id : uuid [FK>patients]
+  specialty_id : uuid [FK>specialties]
+  professional_id : uuid [FK>professionals, NULL]
+  priority_level : varchar[30] [NULL]
+  status : varchar[30]
+  created_at : timestamp
+  --
+  CHECK status ACTIVE / NOTIFIED / COMPLETED / CANCELLED
+}
+
+entity "priority_requests" as priority_requests {
+  id : uuid [PK]
+  appointment_id : uuid [FK>appointments]
+  requested_by : uuid [FK>users]
+  reason : text
+  status : varchar[30]
+  reviewed_by : uuid [FK>users, NULL]
+  created_at : timestamp
+  updated_at : timestamp
+  --
+  CHECK status REQUESTED / UNDER_REVIEW / APPROVED / REJECTED
+}
+
+entity "hospital_business_config" as hospital_business_config {
+  singleton : boolean [PK]
+  zone_name : text
+  --
+  CHECK singleton; zona America/Lima por trigger
+}
+
+permissions "1" -- "0..*" role_permissions : permission_id
+
+note bottom of hospital_business_config
+  El resto de restricciones de V5 incluye
+  guards transaccionales y de desactivación.
+end note
+
+footer PostgreSQL V5 | 7 tablas | varchar[n] equivale a varchar(n) en PostgreSQL
+
+@enduml

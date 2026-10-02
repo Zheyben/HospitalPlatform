@@ -1,5 +1,6 @@
 package com.hospital.platform.users.service;
 
+import com.hospital.platform.agenda.contract.CapacityGateway;
 import com.hospital.platform.users.dto.AssignRoleRequestDTO;
 import com.hospital.platform.users.dto.CreateUserRequestDTO;
 import com.hospital.platform.users.dto.UpdateUserRequestDTO;
@@ -35,17 +36,20 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
+    private final CapacityGateway capacityGateway;
 
     public UserService(
             UserRepository userRepository,
             RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
-            UserMapper userMapper
+            UserMapper userMapper,
+            CapacityGateway capacityGateway
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.userMapper = userMapper;
+        this.capacityGateway = capacityGateway;
     }
 
     @Transactional
@@ -56,10 +60,27 @@ public class UserService {
         assertUsernameAvailable(username);
         assertEmailAvailable(email);
 
-        User user = new User(null, username, email, passwordEncoder.encode(request.password()), true);
-        user.replaceRoles(resolveRoles(request.roles()));
+        return userMapper.toResponse(userRepository.save(
+                newUser(username, email, request.password(), request.roles())
+        ));
+    }
 
-        return userMapper.toResponse(userRepository.save(user));
+    @Transactional
+    public User registerPatientUser(String email, String password, String firstName, String lastName) {
+        String normalizedEmail = normalizeEmail(email);
+        assertEmailAvailable(normalizedEmail);
+
+        User user = newUser(
+                "patient-" + UUID.randomUUID(), normalizedEmail, password, Set.of(RoleName.PATIENT)
+        );
+        user.setNames(firstName.trim(), lastName.trim());
+        return userRepository.saveAndFlush(user);
+    }
+
+    private User newUser(String username, String email, String password, Set<RoleName> roleNames) {
+        User user = new User(null, username, email, passwordEncoder.encode(password), true);
+        user.replaceRoles(resolveRoles(roleNames));
+        return user;
     }
 
     @Transactional(readOnly = true)
@@ -92,14 +113,14 @@ public class UserService {
 
     @Transactional
     public UserResponseDTO updateStatus(UUID userId, UpdateUserStatusRequestDTO request) {
-        User user = findActiveUser(userId);
-
-        user.changeStatus(request.enabled());
-        return userMapper.toResponse(user);
+        findActiveUser(userId);
+        capacityGateway.setUserEnabled(userId, request.enabled());
+        return userMapper.toResponse(findActiveUser(userId));
     }
 
     @Transactional
     public UserResponseDTO assignRoles(UUID userId, AssignRoleRequestDTO request) {
+        capacityGateway.lockUser(userId);
         User user = findActiveUser(userId);
 
         user.replaceRoles(resolveRoles(request.roles()));
@@ -165,7 +186,7 @@ public class UserService {
     }
 
     private String normalizeUsername(String username) {
-        return username.trim();
+        return username.trim().toLowerCase(Locale.ROOT);
     }
 
     private String normalizeEmail(String email) {

@@ -1,17 +1,12 @@
 package com.hospital.platform.appointments.service;
 
-import com.hospital.platform.agenda.contract.AvailabilitySlotReference;
-import com.hospital.platform.agenda.contract.AvailabilitySlotReleaseService;
-import com.hospital.platform.agenda.contract.AvailabilitySlotReservationService;
-import com.hospital.platform.agenda.contract.SlotReleaseRejectedException;
-import com.hospital.platform.agenda.contract.SlotReservationRejectedException;
+import com.hospital.platform.agenda.contract.CapacityGateway;
 import com.hospital.platform.appointments.dto.AppointmentResponseDTO;
 import com.hospital.platform.appointments.dto.CreateAppointmentRequestDTO;
 import com.hospital.platform.appointments.entity.Appointment;
 import com.hospital.platform.appointments.entity.AppointmentStatus;
 import com.hospital.platform.appointments.entity.FlowStage;
 import com.hospital.platform.appointments.exception.AppointmentNotFoundException;
-import com.hospital.platform.appointments.exception.AppointmentSlotReleaseException;
 import com.hospital.platform.appointments.exception.AppointmentSuccessorExistsException;
 import com.hospital.platform.appointments.exception.InvalidAppointmentRequestException;
 import com.hospital.platform.appointments.exception.InvalidAppointmentTransitionException;
@@ -25,7 +20,6 @@ import com.hospital.platform.audit.contract.AuditLogService;
 import com.hospital.platform.patients.contract.PatientLookupService;
 import com.hospital.platform.professionals.contract.ProfessionalLookupService;
 import com.hospital.platform.users.service.CurrentUserService;
-import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
@@ -50,51 +44,35 @@ public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final PatientLookupService patientLookupService;
     private final ProfessionalLookupService professionalLookupService;
-    private final AvailabilitySlotReservationService slotReservationService;
-    private final AvailabilitySlotReleaseService slotReleaseService;
     private final AuditLogService auditLogService;
     private final CurrentUserService currentUserService;
     private final AppointmentMapper appointmentMapper;
+    private final CapacityGateway capacityGateway;
 
     public AppointmentService(
             AppointmentRepository appointmentRepository,
             PatientLookupService patientLookupService,
             ProfessionalLookupService professionalLookupService,
-            AvailabilitySlotReservationService slotReservationService,
-            AvailabilitySlotReleaseService slotReleaseService,
             @Lazy AuditLogService auditLogService,
             CurrentUserService currentUserService,
-            AppointmentMapper appointmentMapper
+            AppointmentMapper appointmentMapper,
+            CapacityGateway capacityGateway
     ) {
         this.appointmentRepository = appointmentRepository;
         this.patientLookupService = patientLookupService;
         this.professionalLookupService = professionalLookupService;
-        this.slotReservationService = slotReservationService;
-        this.slotReleaseService = slotReleaseService;
         this.auditLogService = auditLogService;
         this.currentUserService = currentUserService;
         this.appointmentMapper = appointmentMapper;
+        this.capacityGateway = capacityGateway;
     }
 
     @Transactional
     public AppointmentResponseDTO createAppointment(CreateAppointmentRequestDTO request) {
         UUID patientId = resolvePatientId(request.patientId());
-        AvailabilitySlotReference slot = reserveSlot(request.slotId());
-
-        if (!professionalLookupService.existsActiveProfessional(slot.professionalId())) {
-            throw new ProfessionalNotAvailableException(slot.professionalId());
-        }
-
-        Appointment appointment = new Appointment(
-                null,
-                patientId,
-                slot.professionalId(),
-                slot.slotId(),
-                normalizeNullable(request.reason())
-        );
-
         try {
-            return appointmentMapper.toResponse(appointmentRepository.saveAndFlush(appointment));
+            UUID appointmentId = capacityGateway.reserve(request.slotId(), patientId, normalizeNullable(request.reason()));
+            return appointmentMapper.toResponse(findAppointment(appointmentId));
         } catch (DataIntegrityViolationException exception) {
             throw new SlotUnavailableException(request.slotId(), exception);
         }
@@ -130,8 +108,10 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponseDTO confirmAppointment(UUID appointmentId) {
-        Appointment appointment = findAppointmentForUpdate(appointmentId);
+        capacityGateway.lockAppointment(appointmentId);
+        Appointment appointment = findAppointment(appointmentId);
         authorizeLifecycleOperation(appointment);
+        requireFuture(appointment, "confirmed");
 
         if (appointment.getAppointmentStatus() == AppointmentStatus.CONFIRMED) {
             return appointmentMapper.toResponse(appointment);
@@ -139,7 +119,8 @@ public class AppointmentService {
         requireStatus(appointment, "confirmed", AppointmentStatus.SCHEDULED);
 
         AppointmentStatus previousStatus = appointment.getAppointmentStatus();
-        appointment.confirm();
+        capacityGateway.confirm(appointmentId);
+        appointment = findAppointment(appointmentId);
         recordStatusTransition(
                 AuditEventType.APPOINTMENT_CONFIRMED,
                 appointment,
@@ -151,8 +132,10 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponseDTO cancelAppointment(UUID appointmentId) {
-        Appointment appointment = findAppointmentForUpdate(appointmentId);
+        capacityGateway.lockAppointment(appointmentId);
+        Appointment appointment = findAppointment(appointmentId);
         authorizeLifecycleOperation(appointment);
+        requireFuture(appointment, "cancelled");
 
         if (appointment.getAppointmentStatus() == AppointmentStatus.CANCELLED) {
             return appointmentMapper.toResponse(appointment);
@@ -163,11 +146,12 @@ public class AppointmentService {
                 AppointmentStatus.SCHEDULED,
                 AppointmentStatus.CONFIRMED
         );
+        requireNoActiveFlow(appointment, "cancelled");
 
         AppointmentStatus previousStatus = appointment.getAppointmentStatus();
         UUID actorUserId = currentUserService.currentUserId();
-        appointment.cancel(LocalDateTime.now(), actorUserId);
-        releaseSlot(appointment.getSlotId());
+        capacityGateway.cancel(appointmentId, actorUserId);
+        appointment = findAppointment(appointmentId);
         recordStatusTransition(
                 AuditEventType.APPOINTMENT_CANCELLED,
                 appointment,
@@ -179,42 +163,29 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponseDTO rescheduleAppointment(UUID appointmentId, UUID newSlotId) {
-        Appointment original = findAppointmentForUpdate(appointmentId);
+        capacityGateway.lockReschedule(appointmentId, newSlotId);
+        Appointment original = findAppointment(appointmentId);
         authorizeLifecycleOperation(original);
+        requireFuture(original, "rescheduled");
         requireStatus(
                 original,
                 "rescheduled",
                 AppointmentStatus.SCHEDULED,
                 AppointmentStatus.CONFIRMED
         );
+        requireNoActiveFlow(original, "rescheduled");
         if (appointmentRepository.findByRescheduledFromId(original.getId()).isPresent()) {
             throw new AppointmentSuccessorExistsException(original.getId());
         }
 
-        AvailabilitySlotReference newSlot = reserveSlot(newSlotId);
-        if (!professionalLookupService.existsActiveProfessional(newSlot.professionalId())) {
-            throw new ProfessionalNotAvailableException(newSlot.professionalId());
-        }
-
-        Appointment successor = new Appointment(
-                UUID.randomUUID(),
-                original.getPatientId(),
-                newSlot.professionalId(),
-                newSlot.slotId(),
-                original.getReason(),
-                original.getId()
-        );
-
+        UUID successorId;
         try {
-            appointmentRepository.saveAndFlush(successor);
+            successorId = capacityGateway.reschedule(appointmentId, newSlotId);
         } catch (DataIntegrityViolationException exception) {
             throw new SlotUnavailableException(newSlotId, exception);
         }
-
+        Appointment successor = findAppointment(successorId);
         AppointmentStatus previousStatus = original.getAppointmentStatus();
-        original.markRescheduled();
-        appointmentRepository.saveAndFlush(original);
-        releaseSlot(original.getSlotId());
         auditLogService.record(
                 AuditEventType.APPOINTMENT_RESCHEDULED,
                 "Appointment",
@@ -234,7 +205,8 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponseDTO checkInAppointment(UUID appointmentId) {
-        Appointment appointment = findAppointmentForUpdate(appointmentId);
+        capacityGateway.lockAppointment(appointmentId);
+        Appointment appointment = findAppointment(appointmentId);
         authorizeReceptionOperation();
 
         if (hasState(appointment, AppointmentStatus.CONFIRMED, FlowStage.CHECK_IN)) {
@@ -244,7 +216,8 @@ public class AppointmentService {
 
         AppointmentStatus previousStatus = appointment.getAppointmentStatus();
         FlowStage previousStage = appointment.getFlowStage();
-        appointment.checkIn();
+        capacityGateway.stage(appointmentId, FlowStage.CHECK_IN.name());
+        appointment = findAppointment(appointmentId);
         recordFlowTransition(
                 AuditEventType.APPOINTMENT_CHECKED_IN,
                 appointment,
@@ -256,7 +229,8 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponseDTO moveAppointmentToWaiting(UUID appointmentId) {
-        Appointment appointment = findAppointmentForUpdate(appointmentId);
+        capacityGateway.lockAppointment(appointmentId);
+        Appointment appointment = findAppointment(appointmentId);
         authorizeReceptionOperation();
 
         if (hasState(appointment, AppointmentStatus.CONFIRMED, FlowStage.WAITING)) {
@@ -266,7 +240,8 @@ public class AppointmentService {
 
         AppointmentStatus previousStatus = appointment.getAppointmentStatus();
         FlowStage previousStage = appointment.getFlowStage();
-        appointment.moveToWaiting();
+        capacityGateway.stage(appointmentId, FlowStage.WAITING.name());
+        appointment = findAppointment(appointmentId);
         recordFlowTransition(
                 AuditEventType.APPOINTMENT_WAITING,
                 appointment,
@@ -278,7 +253,8 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponseDTO startAppointmentAttention(UUID appointmentId) {
-        Appointment appointment = findAppointmentForUpdate(appointmentId);
+        capacityGateway.lockAppointment(appointmentId);
+        Appointment appointment = findAppointment(appointmentId);
         authorizeProfessionalOperation(appointment);
 
         if (hasState(appointment, AppointmentStatus.CONFIRMED, FlowStage.IN_ATTENTION)) {
@@ -288,7 +264,8 @@ public class AppointmentService {
 
         AppointmentStatus previousStatus = appointment.getAppointmentStatus();
         FlowStage previousStage = appointment.getFlowStage();
-        appointment.startAttention();
+        capacityGateway.stage(appointmentId, FlowStage.IN_ATTENTION.name());
+        appointment = findAppointment(appointmentId);
         recordFlowTransition(
                 AuditEventType.APPOINTMENT_ATTENTION_STARTED,
                 appointment,
@@ -300,17 +277,23 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponseDTO completeAppointment(UUID appointmentId) {
-        Appointment appointment = findAppointmentForUpdate(appointmentId);
+        capacityGateway.lockAppointment(appointmentId);
+        Appointment appointment = findAppointment(appointmentId);
         authorizeProfessionalOperation(appointment);
 
         if (hasState(appointment, AppointmentStatus.COMPLETED, FlowStage.FINISHED)) {
             return appointmentMapper.toResponse(appointment);
         }
         requireFlowState(appointment, FlowStage.IN_ATTENTION, "completed");
+        if (capacityGateway.isFutureSlot(appointment.getSlotId())) {
+            throw new InvalidAppointmentTransitionException(
+                    appointment.getId(), appointment.getAppointmentStatus(), "completed before slot start");
+        }
 
         AppointmentStatus previousStatus = appointment.getAppointmentStatus();
         FlowStage previousStage = appointment.getFlowStage();
-        appointment.complete();
+        capacityGateway.complete(appointmentId);
+        appointment = findAppointment(appointmentId);
         recordFlowTransition(
                 AuditEventType.APPOINTMENT_COMPLETED,
                 appointment,
@@ -346,16 +329,8 @@ public class AppointmentService {
                 ));
     }
 
-    private AvailabilitySlotReference reserveSlot(UUID slotId) {
-        try {
-            return slotReservationService.reserveUsableSlot(slotId);
-        } catch (SlotReservationRejectedException exception) {
-            throw new SlotUnavailableException(slotId, exception);
-        }
-    }
-
-    private Appointment findAppointmentForUpdate(UUID appointmentId) {
-        return appointmentRepository.findByIdForUpdate(appointmentId)
+    private Appointment findAppointment(UUID appointmentId) {
+        return appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new AppointmentNotFoundException(appointmentId));
     }
 
@@ -402,6 +377,22 @@ public class AppointmentService {
         );
     }
 
+    private void requireFuture(Appointment appointment, String operation) {
+        if (!capacityGateway.isFutureSlot(appointment.getSlotId())) {
+            throw new InvalidAppointmentTransitionException(
+                    appointment.getId(), appointment.getAppointmentStatus(), operation);
+        }
+    }
+
+    private void requireNoActiveFlow(Appointment appointment, String operation) {
+        if (appointment.getFlowStage() == FlowStage.CHECK_IN
+                || appointment.getFlowStage() == FlowStage.WAITING
+                || appointment.getFlowStage() == FlowStage.IN_ATTENTION) {
+            throw new InvalidAppointmentTransitionException(
+                    appointment.getId(), appointment.getAppointmentStatus(), operation);
+        }
+    }
+
     private boolean hasState(
             Appointment appointment,
             AppointmentStatus status,
@@ -426,14 +417,6 @@ public class AppointmentService {
                 appointment.getAppointmentStatus(),
                 operation
         );
-    }
-
-    private void releaseSlot(UUID slotId) {
-        try {
-            slotReleaseService.releaseReservedSlot(slotId);
-        } catch (SlotReleaseRejectedException exception) {
-            throw new AppointmentSlotReleaseException(slotId, exception);
-        }
     }
 
     private void recordStatusTransition(

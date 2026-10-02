@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Médico - Hospital de Huaycán</title>
+    <link rel="stylesheet" href="../Estilos/Estilos.css">
+</head>
+<body class="dashboard-body">
+    <!-- BARRA SUPERIOR DOCTOR -->
+    <header class="navbar-new">
+        <div class="logo-container">
+            <img src="../Imagenes/hospital-de-huaycan-logo.jpg" alt="Logo" class="logo-img">
+            <span class="brand-name">Hospital de Huaycán</span>
+        </div>
+        
+        <div class="user-profile-widget-right">
+            <div class="user-avatar"></div>
+            <div class="user-info-right">
+                <span class="user-name">DR. JORGE RAMÍREZ SILVA</span>
+                <div class="role-logout-container">
+                    <span class="user-role">Médico</span>
+                    <a href="Index.html" class="logout-link" style="font-size: 0.75rem;">Cerrar cuenta</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard-container" style="display: flex; gap: 2rem; align-items: flex-start;">
+        
+        <!-- COLUMNA IZQUIERDA (CONTENIDO) -->
+        <div style="flex: 1;">
+            <div class="dashboard-header" style="background: linear-gradient(90deg, #f8fafc, #e2e8f0); padding: 2rem; border-radius: 15px; border-left: 5px solid #0f172a; margin-bottom: 2rem;">
+                <h2 style="font-size: 1.8rem; margin-bottom: 0.5rem; color: #0f172a;">Bienvenido a tu portal médico</h2>
+                <p style="color: var(--text-gray); font-size: 1.05rem;">Accede a tu agenda diaria, revisa el historial clínico de tus pacientes y gestiona tu disponibilidad.</p>
+            </div>
+
+            <section class="clean-action-cards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+                <a href="#" class="clean-card" style="border-top: 4px solid #0f172a;">
+                    <h3 style="color: #0f172a;">Agenda de Citas</h3>
+                    <p>Revisa los pacientes programados para hoy y administra tus horarios.</p>
+                </a>
+                <a href="#" class="clean-card" style="border-top: 4px solid #0f172a;">
+                    <h3 style="color: #0f172a;">Historial Clínico</h3>
+                    <p>Consulta y actualiza la información médica y tratamientos de tus pacientes.</p>
+                </a>
+                <a href="#" class="clean-card" style="border-top: 4px solid #0f172a;">
+                    <h3 style="color: #0f172a;">Disponibilidad</h3>
+                    <p>Configura tus turnos, días libres y horas de atención en consultorio.</p>
+                </a>
+            </section>
+        </div>
+
+    </main>
+</body>
+</html>

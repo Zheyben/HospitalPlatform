@@ -6,12 +6,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "patients")
+@Table(name = "patients", uniqueConstraints = @UniqueConstraint(
+        name = "uq_patients_document_identity", columnNames = {"document_type", "document_number"}))
 public class Patient {
 
     @Id
@@ -24,7 +26,7 @@ public class Patient {
     @Column(name = "document_type", length = 50)
     private String documentType;
 
-    @Column(name = "document_number", unique = true, length = 50)
+    @Column(name = "document_number", length = 50)
     private String documentNumber;
 
     @Column(name = "birth_date")
@@ -32,6 +34,9 @@ public class Patient {
 
     @Column(length = 50)
     private String phone;
+
+    @Column(length = 150)
+    private String insurance;
 
     @Column(columnDefinition = "TEXT")
     private String address;
@@ -108,6 +113,11 @@ public class Patient {
         touch();
     }
 
+    public void setInsurance(String insurance) {
+        this.insurance = insurance;
+        touch();
+    }
+
     public UUID getId() {
         return id;
     }
@@ -130,6 +140,10 @@ public class Patient {
 
     public String getPhone() {
         return phone;
+    }
+
+    public String getInsurance() {
+        return insurance;
     }
 
     public String getAddress() {

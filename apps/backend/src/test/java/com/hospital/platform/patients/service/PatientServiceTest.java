@@ -75,7 +75,7 @@ class PatientServiceTest {
 
     @Test
     void rejectsDuplicatedDocument() {
-        when(patientRepository.existsByDocumentNumberIgnoreCase("12345678")).thenReturn(true);
+        when(patientRepository.existsByDocumentTypeAndDocumentNumber("DNI", "12345678")).thenReturn(true);
 
         assertThatThrownBy(() -> patientService.createPatient(new CreatePatientRequestDTO(
                 "DNI",
@@ -84,6 +84,30 @@ class PatientServiceTest {
                 null,
                 null
         ))).isInstanceOf(DuplicateDocumentException.class);
+    }
+
+    @Test
+    void registrationLinksPatientAndPersistsInsurance() {
+        when(patientRepository.saveAndFlush(any(Patient.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        PatientResponseDTO response = patientService.registerPatient(
+                USER_ID, "dni", "12345678", LocalDate.of(1990, 1, 1), " +57 300 1234567 ", " Demo Health "
+        );
+
+        assertThat(response.userId()).isEqualTo(USER_ID);
+        assertThat(response.insurance()).isEqualTo("Demo Health");
+        assertThat(response.documentType()).isEqualTo("DNI");
+    }
+
+    @Test
+    void registrationRejectsDuplicateDocumentBeforePersisting() {
+        when(patientRepository.existsByDocumentTypeAndDocumentNumber("DNI", "12345678")).thenReturn(true);
+
+        assertThatThrownBy(() -> patientService.registerPatient(
+                USER_ID, "DNI", "12345678", LocalDate.of(1990, 1, 1), "3001234567", "Demo Health"
+        )).isInstanceOf(DuplicateDocumentException.class);
+        verify(patientRepository, org.mockito.Mockito.never()).saveAndFlush(any(Patient.class));
     }
 
     @Test

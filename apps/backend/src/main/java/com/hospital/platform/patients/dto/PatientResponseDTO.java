@@ -10,6 +10,7 @@ public record PatientResponseDTO(
         String documentNumber,
         LocalDate birthDate,
         String phone,
+        String insurance,
         String address,
         boolean active
 ) {

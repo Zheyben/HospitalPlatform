@@ -81,7 +81,7 @@ public class AgendaController {
     }
 
     @GetMapping("/availability")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PATIENT')")
     public List<AvailabilitySlotResponseDTO> findAvailability(
             @RequestParam(required = false) UUID scheduleId,
             @RequestParam(required = false) UUID professionalId,

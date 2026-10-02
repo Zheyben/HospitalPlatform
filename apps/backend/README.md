@@ -67,6 +67,38 @@ La API utilizara versionado bajo `/api/v1` cuando se implementen endpoints funci
 
 `verify` ejecuta las pruebas de integracion `*IT` con PostgreSQL mediante Testcontainers.
 
+## Demo de disponibilidad para PATIENT (B2)
+
+`Schedule.dayOfWeek` usa la convencion SQL: `0=domingo` hasta `6=sabado`.
+`SlotGenerationService.generate(scheduleId)` es una operacion explicita reutilizable; no hay
+job ni endpoint para generarla. Produce intervalos de 30 minutos desde `startTime`, sin
+exceder `endTime`, para los siguientes 14 dias UTC (desde manana). La insercion usa la
+clave unica `(schedule_id, slot_date, start_time)` y no modifica slots existentes.
+
+Para datos locales reproducibles, iniciar el backend con perfil `dev` y
+`DEMO_SEED_ENABLED=true`. Por defecto el seed esta desactivado y nunca se ejecuta en
+`test` o `prod`. Crea una especialidad, un profesional con cuenta deshabilitada,
+la relacion profesional-especialidad, siete horarios semanales (09:00-12:00 UTC)
+y slots futuros. Repetir el inicio agrega solo fechas nuevas y conserva los slots
+ya reservados. No crea una contrasena conocida para el profesional de demo.
+
+Con el PostgreSQL de `docker-compose.yml` iniciado desde la raiz del repositorio:
+
+```powershell
+docker build -f apps/backend/Dockerfile -t hospital-platform-backend:b2 .
+docker run --rm --name hospital-platform-b2-api --network hospital-platform_default `
+  --env-file .env -e DATABASE_URL=jdbc:postgresql://postgres:5432/hospital_platform `
+  -e SPRING_PROFILE=dev -e SERVER_PORT=8080 -e DEMO_SEED_ENABLED=true `
+  -p 127.0.0.1:18080:8080 hospital-platform-backend:b2
+```
+
+Un PATIENT autenticado puede consultar `GET /api/v1/availability`. El servidor
+solo devuelve slots futuros `AVAILABLE` de horarios, profesionales y especialidades
+activos; el filtro `status` del cliente no amplia esos resultados. Cada fila incluye
+`slotId` (alias de `id` por compatibilidad), fecha, horas, profesional y especialidad.
+La reserva usa `POST /api/v1/appointments` con `slotId` y `reason`; el paciente
+se obtiene del token. Un segundo intento sobre el mismo slot devuelve 409.
+
 ## Migraciones
 
 La migracion oficial vive en:

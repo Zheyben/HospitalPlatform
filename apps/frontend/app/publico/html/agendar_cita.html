@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agendar Cita - Hospital de Huaycán</title>
+    <link rel="stylesheet" href="../Estilos/Estilos.css">
+</head>
+<body class="dashboard-body">
+    <header class="navbar-new">
+        <div class="logo-container">
+            <img src="../Imagenes/hospital-de-huaycan-logo.jpg" alt="Logo" class="logo-img">
+            <span class="brand-name">Hospital de Huaycán</span>
+        </div>
+        
+        <div class="user-profile-widget-right">
+            <div class="user-avatar"></div>
+            <div class="user-info-right">
+                <span class="user-name">EDUAR ALONZO VALQUI CABELLO</span>
+                <div class="role-logout-container">
+                    <span class="user-role">Paciente</span>
+                    <a href="Index.html" class="logout-link" style="font-size: 0.75rem;">Cerrar cuenta</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard-container" style="max-width: 800px;">
+        <div class="dashboard-header" style="margin-bottom: 2rem;">
+            <h2 style="color: var(--text-dark); font-size: 2rem; margin-bottom: 0.5rem; font-weight: 600;">Agendar Nueva Cita</h2>
+            <p style="color: var(--text-gray); font-size: 1.05rem;">Complete el formulario a continuación para programar su atención médica.</p>
+        </div>
+
+        <section style="background-color: var(--white); padding: 3rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); border: 1px solid var(--border-color);">
+            <form action="ver_cita.html" method="GET" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                
+                <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px;">
+                        <label style="display: block; margin-bottom: 0.8rem; font-weight: 600; color: var(--text-dark); font-size: 0.95rem;">Especialidad Requerida</label>
+                        <select id="select-especialidad" onchange="actualizarMedicos()" required style="width: 100%; padding: 1rem; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--light-bg); font-size: 1rem; color: var(--text-dark); outline: none; transition: border-color 0.2s;">
+                            <option value="">Seleccione una especialidad...</option>
+                            <option value="Medicina General">Medicina General</option>
+                            <option value="Medicina Interna">Medicina Interna</option>
+                            <option value="Pediatría">Pediatría</option>
+                            <option value="Cardiología">Cardiología</option>
+                            <option value="Odontología">Odontología</option>
+                            <option value="Gineco-Obstetricia">Gineco-Obstetricia</option>
+                            <option value="Psicología">Psicología</option>
+                            <option value="Emergencias">Emergencias</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1; min-width: 250px;">
+                        <label style="display: block; margin-bottom: 0.8rem; font-weight: 600; color: var(--text-dark); font-size: 0.95rem;">Médico Disponible</label>
+                        <select id="select-medico" required style="width: 100%; padding: 1rem; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--light-bg); font-size: 1rem; color: var(--text-dark); outline: none; transition: border-color 0.2s;">
+                            <option value="">Seleccione un médico...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px;">
+                        <label style="display: block; margin-bottom: 0.8rem; font-weight: 600; color: var(--text-dark); font-size: 0.95rem;">Fecha de la Consulta</label>
+                        <input type="date" required style="width: 100%; padding: 1rem; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--light-bg); font-size: 1rem; color: var(--text-dark); outline: none; transition: border-color 0.2s;">
+                    </div>
+                    <div style="flex: 1; min-width: 250px;">
+                        <label style="display: block; margin-bottom: 0.8rem; font-weight: 600; color: var(--text-dark); font-size: 0.95rem;">Horario Preferido</label>
+                        <select required style="width: 100%; padding: 1rem; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--light-bg); font-size: 1rem; color: var(--text-dark); outline: none; transition: border-color 0.2s;">
+                            <option value="">Seleccione un horario...</option>
+                            <option>08:00 AM</option>
+                            <option>09:30 AM</option>
+                            <option>11:00 AM</option>
+                            <option>03:00 PM</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem; padding: 1.5rem; background-color: var(--light-bg); border-radius: 8px; display: flex; align-items: center; gap: 15px;">
+                    <input type="checkbox" name="notificar_correo" checked style="width: 20px; height: 20px; accent-color: var(--text-dark); cursor: pointer;"> 
+                    <span style="font-size: 0.95rem; color: var(--text-gray);">Deseo recibir la confirmación detallada de la cita y la boleta electrónica en mi correo.</span>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-top: 1.5rem;">
+                    <a href="personal.html" style="flex: 1; padding: 1rem; text-align: center; text-decoration: none; border-radius: 8px; border: 1px solid var(--text-dark); color: var(--text-dark); font-weight: 600; transition: background-color 0.2s;">Cancelar Operación</a>
+                    <button type="submit" style="flex: 2.5; padding: 1rem; border-radius: 8px; background-color: var(--text-dark); color: white; border: none; font-weight: 600; cursor: pointer; transition: opacity 0.2s;">Confirmar y Agendar Cita</button>
+                </div>
+            </form>
+        </section>
+    </main>
+
+    <!-- SCRIPT PARA CARGAR DOCTORES DINÁMICAMENTE -->
+    <script>
+        const medicosPorEspecialidad = {
+            "Medicina General": ["Dr. Luis Alvarado Torres", "Dra. Juana Cárdenas", "Dr. Pedro Infante"],
+            "Medicina Interna": ["Dr. Jorge Ramírez Silva", "Dra. María Fernández Ríos", "Dr. Carlos Mendoza Paz"],
+            "Pediatría": ["Dra. Sofia Castillo Vargas", "Dr. Luis Paredes Gómez", "Dra. Ana López Castro"],
+            "Cardiología": ["Dr. Roberto Santos", "Dra. Elena Torres", "Dr. Miguel Ángeles"],
+            "Odontología": ["Dr. Manuel Vargas", "Dra. Patricia León", "Dr. Julio Cárdenas"],
+            "Gineco-Obstetricia": ["Dra. Carmen Ríos Silva", "Dr. Felipe Aguilar", "Dra. Teresa Ramos"],
+            "Psicología": ["Lic. Andrea Ruiz", "Lic. Fernando Valle", "Lic. Patricia Montes"],
+            "Emergencias": ["Dr. Raúl Quiroz", "Dra. Mónica Pineda", "Dr. José Villanueva"]
+        };
+
+        function actualizarMedicos() {
+            const especialidad = document.getElementById("select-especialidad").value;
+            const selectMedico = document.getElementById("select-medico");
+            
+            // Limpiar opciones anteriores
+            selectMedico.innerHTML = '<option value="">Seleccione un médico...</option>';
+            
+            if (especialidad && medicosPorEspecialidad[especialidad]) {
+                medicosPorEspecialidad[especialidad].forEach(medico => {
+                    let option = document.createElement("option");
+                    option.value = medico;
+                    option.text = medico;
+                    selectMedico.add(option);
+                });
+            }
+        }
+    </script>
+</body>
+</html>

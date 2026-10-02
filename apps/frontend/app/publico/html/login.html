@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso - Hospital de Huaycán</title>
+    <link rel="stylesheet" href="../Estilos/Estilos.css">
+</head>
+<body class="login-body">
+    <div class="login-container">
+        <div class="login-image-side">
+        </div>
+        
+        <div class="login-form-side">
+            <div class="logo-container" style="margin-bottom: 1.5rem; justify-content: center;">
+                <img src="../Imagenes/hospital-de-huaycan-logo.jpg" alt="Logo" class="logo-img">
+                <span class="brand-name">Hospital de Huaycán</span>
+            </div>
+            
+            <!-- FORMULARIO DE INICIO DE SESIÓN -->
+            <div id="login-section">
+                <h2>Iniciar sesión</h2>
+                <form id="login-form" class="auth-form">
+                    <div class="form-group-row">
+                        <div class="form-group" style="width: 30%;">
+                            <label>Documento</label>
+                            <select id="login-tipo">
+                                <option>DNI</option>
+                                <option>CE</option>
+                                <option>USUARIO</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="width: 70%;">
+                            <label>&nbsp;</label>
+                            <input type="text" id="login-doc" placeholder="Nro de documento / Usuario" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Contraseña</label>
+                        <input type="password" id="login-pass" placeholder="Contraseña" required>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <a href="#" class="forgot-password">¿Olvidaste tu contraseña?</a>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary btn-block">Ingresar</button>
+                    <p class="register-prompt" style="margin-bottom: 0.5rem;">¿No tienes cuenta? <a href="#" onclick="toggleForms('register-patient')">Crear cuenta paciente</a></p>
+                </form>
+            </div>
+
+
+            <!-- FORMULARIO PACIENTE -->
+            <div id="register-patient" style="display: none;">
+                <h2>Crear Cuenta de Paciente</h2>
+                <form action="personal.html" class="auth-form">
+                    <div class="form-group"><input type="text" placeholder="Número de DNI" required></div>
+                    <div class="form-group"><input type="text" placeholder="Nombres completos" required></div>
+                    <div class="form-group-row">
+                        <div class="form-group" style="width: 50%;"><input type="text" placeholder="Apellido Paterno" required></div>
+                        <div class="form-group" style="width: 50%;"><input type="text" placeholder="Apellido Materno" required></div>
+                    </div>
+                    <div class="form-group"><input type="email" placeholder="Correo Electrónico" required></div>
+                    <div class="form-group"><input type="password" placeholder="Crear Contraseña" required></div>
+                    <button type="submit" class="btn-primary btn-block">Registrarse</button>
+                    <p class="register-prompt"><a href="#" onclick="toggleForms('login')">Volver a Iniciar sesión</a></p>
+                </form>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function toggleForms(target) {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('register-patient').style.display = 'none';
+            
+            // Fix target id for default login
+            let finalTarget = target === 'login' ? 'login-section' : target;
+            document.getElementById(finalTarget).style.display = 'block';
+        }
+
+        // LÓGICA DE LOGIN PARA USUARIO
+        document.getElementById('login-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            window.location.href = 'personal.html'; // Redirige al paciente por defecto
+        });
+    </script>
+</body>
+</html>

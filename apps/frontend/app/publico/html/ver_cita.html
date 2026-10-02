@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Citas - Hospital de Huaycán</title>
+    <link rel="stylesheet" href="../Estilos/Estilos.css">
+</head>
+<body class="dashboard-body">
+ <header class="navbar-new">
+        <div class="logo-container">
+            <img src="../Imagenes/hospital-de-huaycan-logo.jpg" alt="Logo" class="logo-img">
+            <span class="brand-name">Hospital de Huaycán</span>
+        </div>
+        
+        <div class="user-profile-widget-right">
+            <div class="user-avatar"></div>
+            <div class="user-info-right">
+                <span class="user-name">EDUAR ALONZO VALQUI CABELLO</span>
+                <div class="role-logout-container">
+                    <span class="user-role">Paciente</span>
+                    <a href="Index.html" class="logout-link" style="font-size: 0.75rem;">Cerrar cuenta</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard-container" style="max-width: 1100px;">
+        <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: flex-end;">
+            <div>
+                <h2 style="color: var(--dark-blue);">Historial de Citas</h2>
+                <p>Revisa el estado de tus consultas médicas actuales y pasadas.</p>
+            </div>
+            <a href="agendar_cita.html" class="btn-primary" style="text-decoration: none; padding: 0.6rem 1.2rem; border-radius: 8px;">+ Nueva Cita</a>
+        </div>
+
+        <div style="display: flex; gap: 2rem; align-items: flex-start;">
+            <section style="background-color: var(--white); padding: 2rem; flex: 2; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid var(--border-color);">
+                <div class="table-responsive">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-dark);">
+                                <th style="padding: 1rem 0; font-weight: 600;">Fecha y Hora</th>
+                                <th style="padding: 1rem 0; font-weight: 600;">Especialidad</th>
+                                <th style="padding: 1rem 0; font-weight: 600;">Médico Tratante</th>
+                                <th style="padding: 1rem 0; font-weight: 600;">Estado</th>
+                                <th style="padding: 1rem 0; font-weight: 600;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 1rem 0; color: var(--text-gray);">25 Oct 2026 - 09:00 AM</td>
+                                <td style="padding: 1rem 0; color: var(--text-gray);">Medicina General</td>
+                                <td style="padding: 1rem 0; color: var(--text-gray);">Dr. Jorge Ramírez</td>
+                                <td style="padding: 1rem 0;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="width: 10px; height: 10px; border-radius: 50%; background-color: #ef4444;"></div>
+                                        <span style="color: var(--text-dark); font-weight: 500;">Cancelada</span>
+                                    </div>
+                                </td>
+                                <td style="padding: 1rem 0;"><button style="background: none; border: 1px solid var(--border-color); padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; color: var(--text-dark);">Detalles</button></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 1rem 0; color: var(--text-gray);">20 Oct 2026 - 11:30 AM</td>
+                                <td style="padding: 1rem 0; color: var(--text-gray);">Cardiología</td>
+                                <td style="padding: 1rem 0; color: var(--text-gray);">Dra. Elena Torres</td>
+                                <td style="padding: 1rem 0;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="width: 10px; height: 10px; border-radius: 50%; background-color: #f97316;"></div>
+                                        <span style="color: var(--text-dark); font-weight: 500;">Pendiente</span>
+                                    </div>
+                                </td>
+                                <td style="padding: 1rem 0;"><button style="background: none; border: 1px solid var(--border-color); padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; color: var(--text-dark);">Modificar</button></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 1rem 0; color: var(--text-gray);">15 Sep 2026 - 10:00 AM</td>
+                                <td style="padding: 1rem 0; color: var(--text-gray);">Odontología</td>
+                                <td style="padding: 1rem 0; color: var(--text-gray);">Dr. Manuel Vargas</td>
+                                <td style="padding: 1rem 0;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="width: 10px; height: 10px; border-radius: 50%; background-color: #22c55e;"></div>
+                                        <span style="color: var(--text-dark); font-weight: 500;">Asistida</span>
+                                    </div>
+                                </td>
+                                <td style="padding: 1rem 0;"><span style="color: var(--text-gray); font-size: 0.9rem; text-decoration: underline; cursor: pointer;">Ver Informe</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- CALENDARIO DINÁMICO -->
+            <aside class="clean-card" style="flex: 1; padding: 1.5rem; text-align: center; border-radius: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <button onclick="cambiarMes(-1)" class="btn-outline" style="padding: 0.2rem 0.6rem; margin: 0; border-radius: 5px;">&lt;</button>
+                    <h3 style="margin: 0; color: var(--dark-blue); font-size: 1.1rem;" id="mes-anio"></h3>
+                    <button onclick="cambiarMes(1)" class="btn-outline" style="padding: 0.2rem 0.6rem; margin: 0; border-radius: 5px;">&gt;</button>
+                </div>
+                <div class="calendario-grid" id="calendario-dias">
+                    <!-- Javascript llenará los días aquí -->
+                </div>
+            </aside>
+        </div>
+        
+        <div style="margin-top: 2rem;">
+            <a href="personal.html" style="color: var(--primary-blue); text-decoration: none; font-weight: 600;">Volver al Inicio</a>
+        </div>
+    </main>
+
+    <script>
+        let fechaActual = new Date();
+        const mesAnio = document.getElementById('mes-anio');
+        const calendarioDias = document.getElementById('calendario-dias');
+        const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+        function renderizarCalendario() {
+            calendarioDias.innerHTML = '';
+            mesAnio.innerText = `${meses[fechaActual.getMonth()]} ${fechaActual.getFullYear()}`;
+            
+            const diasSemana = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+            diasSemana.forEach(d => {
+                calendarioDias.innerHTML += `<div style="font-weight: bold; color: var(--text-gray); padding-bottom: 5px; border-bottom: 1px solid var(--border-color);">${d}</div>`;
+            });
+
+            const primerDia = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1).getDay();
+            const diasEnMes = new Date(fechaActual.getFullYear(), fechaActual.getMonth() + 1, 0).getDate();
+
+            for (let i = 0; i < primerDia; i++) {
+                calendarioDias.innerHTML += `<div></div>`;
+            }
+            
+            for (let i = 1; i <= diasEnMes; i++) {
+                let estiloHoy = 'cursor: pointer; position: relative; padding: 10px 0; border-radius: 8px; transition: background 0.2s;';
+                if (i === hoy.getDate() && fechaActual.getMonth() === hoy.getMonth() && fechaActual.getFullYear() === hoy.getFullYear()) {
+                    estiloHoy += ' font-weight: bold; background-color: #f1f5f9;';
+                }
+                
+                let dotHtml = '';
+                // Simular cita en días específicos (cancelado=25 rojo, pendiente=20 naranja, asistido=15 verde)
+                if (fechaActual.getMonth() === 9 && fechaActual.getFullYear() === 2026) { // 9 = Octubre (0-indexed)
+                    if (i === 25) dotHtml = '<div style="width: 6px; height: 6px; border-radius: 50%; background-color: #ef4444; margin: 2px auto 0;"></div>';
+                    if (i === 20) dotHtml = '<div style="width: 6px; height: 6px; border-radius: 50%; background-color: #f97316; margin: 2px auto 0;"></div>';
+                }
+                if (fechaActual.getMonth() === 8 && fechaActual.getFullYear() === 2026) { // 8 = Septiembre
+                    if (i === 15) dotHtml = '<div style="width: 6px; height: 6px; border-radius: 50%; background-color: #22c55e; margin: 2px auto 0;"></div>';
+                }
+
+                calendarioDias.innerHTML += `<div style="${estiloHoy}" onmouseover="this.style.backgroundColor='#f1f5f9'" onmouseout="this.style.backgroundColor='${(i === hoy.getDate() && fechaActual.getMonth() === hoy.getMonth()) ? '#f1f5f9' : 'transparent'}'">${i}${dotHtml}</div>`;
+            }
+        }
+
+        function cambiarMes(cambio) {
+            fechaActual.setMonth(fechaActual.getMonth() + cambio);
+            renderizarCalendario();
+        }
+
+        renderizarCalendario();
+    </script>
+</body>
+</html>

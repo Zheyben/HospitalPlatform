@@ -1,0 +1,37 @@
+@startuml
+title HOSPITALPLATFORM | Modelo conceptual de datos
+left to right direction
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontColor #123B52
+skinparam ArrowColor #1E5A78
+skinparam entity {
+  BackgroundColor #E9F3F7
+  BorderColor #1E5A78
+  FontColor #123B52
+  FontSize 18
+}
+skinparam linetype polyline
+hide empty members
+
+entity "Usuario" as Usuario
+entity "Rol" as Rol
+entity "Paciente" as Paciente
+entity "Profesional" as Profesional
+entity "Especialidad" as Especialidad
+entity "Horario semanal" as Horario
+entity "Slot de agenda" as Slot
+entity "Cita" as Cita
+
+Usuario }o--o{ Rol
+Usuario "0..1" -- "0..1" Paciente
+Usuario "0..1" -- "0..1" Profesional
+Profesional }o--o{ Especialidad
+Profesional ||--o{ Horario
+Especialidad ||--o{ Horario
+Horario ||--o{ Slot
+Paciente ||--o{ Cita
+Profesional ||--o{ Cita
+Slot ||--o{ Cita
+@enduml

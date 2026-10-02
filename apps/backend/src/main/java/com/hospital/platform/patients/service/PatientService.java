@@ -5,6 +5,7 @@ import com.hospital.platform.patients.dto.LinkUserRequestDTO;
 import com.hospital.platform.patients.dto.PatientResponseDTO;
 import com.hospital.platform.patients.dto.UpdatePatientRequestDTO;
 import com.hospital.platform.patients.dto.UpdatePatientStatusRequestDTO;
+import com.hospital.platform.patients.domain.DocumentIdentity;
 import com.hospital.platform.patients.entity.Patient;
 import com.hospital.platform.patients.exception.DuplicateDocumentException;
 import com.hospital.platform.patients.exception.PatientAlreadyLinkedException;
@@ -15,8 +16,8 @@ import com.hospital.platform.patients.mapper.PatientMapper;
 import com.hospital.platform.patients.repository.PatientRepository;
 import com.hospital.platform.users.service.CurrentUserService;
 import com.hospital.platform.users.service.UserLookupService;
+import java.time.LocalDate;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,19 +44,24 @@ public class PatientService {
 
     @Transactional
     public PatientResponseDTO createPatient(CreatePatientRequestDTO request) {
-        String documentNumber = normalizeDocumentNumber(request.documentNumber());
-        assertDocumentAvailable(documentNumber);
-
-        Patient patient = new Patient(
-                null,
-                normalizeDocumentType(request.documentType()),
-                documentNumber,
-                request.birthDate(),
-                normalizeNullable(request.phone()),
-                normalizeNullable(request.address())
+        return createPatientRecord(
+                request.documentType(), request.documentNumber(), request.birthDate(),
+                request.phone(), request.address(), null, null
         );
+    }
 
-        return patientMapper.toResponse(patientRepository.save(patient));
+    @Transactional
+    public PatientResponseDTO registerPatient(
+            UUID userId,
+            String documentType,
+            String documentNumber,
+            LocalDate birthDate,
+            String phone,
+            String insurance
+    ) {
+        return createPatientRecord(
+                documentType, documentNumber, birthDate, phone, null, insurance, userId
+        );
     }
 
     @Transactional(readOnly = true)
@@ -79,15 +85,16 @@ public class PatientService {
     @Transactional
     public PatientResponseDTO updatePatient(UUID patientId, UpdatePatientRequestDTO request) {
         Patient patient = findActivePatient(patientId);
-        String documentNumber = normalizeDocumentNumber(request.documentNumber());
+        String documentType = DocumentIdentity.type(request.documentType());
+        String documentNumber = DocumentIdentity.number(request.documentNumber());
+        DocumentIdentity.requireValid(documentType, documentNumber);
 
-        if (!patient.getDocumentNumber().equalsIgnoreCase(documentNumber)
-                && patientRepository.existsByDocumentNumberIgnoreCaseAndIdNot(documentNumber, patientId)) {
+        if (patientRepository.existsByDocumentTypeAndDocumentNumberAndIdNot(documentType, documentNumber, patientId)) {
             throw new DuplicateDocumentException(documentNumber);
         }
 
         patient.updateAdministrativeInfo(
-                normalizeDocumentType(request.documentType()),
+                documentType,
                 documentNumber,
                 request.birthDate(),
                 normalizeNullable(request.phone()),
@@ -129,18 +136,43 @@ public class PatientService {
                 .orElseThrow(() -> new PatientNotFoundException(patientId));
     }
 
-    private void assertDocumentAvailable(String documentNumber) {
-        if (patientRepository.existsByDocumentNumberIgnoreCase(documentNumber)) {
+    private void assertDocumentAvailable(String documentType, String documentNumber) {
+        if (patientRepository.existsByDocumentTypeAndDocumentNumber(documentType, documentNumber)) {
             throw new DuplicateDocumentException(documentNumber);
         }
     }
 
-    private String normalizeDocumentType(String documentType) {
-        return documentType.trim().toUpperCase(Locale.ROOT);
-    }
+    private PatientResponseDTO createPatientRecord(
+            String documentType,
+            String documentNumber,
+            LocalDate birthDate,
+            String phone,
+            String address,
+            String insurance,
+            UUID userId
+    ) {
+        String normalizedDocumentType = DocumentIdentity.type(documentType);
+        String normalizedDocumentNumber = DocumentIdentity.number(documentNumber);
+        DocumentIdentity.requireValid(normalizedDocumentType, normalizedDocumentNumber);
+        assertDocumentAvailable(normalizedDocumentType, normalizedDocumentNumber);
 
-    private String normalizeDocumentNumber(String documentNumber) {
-        return documentNumber.trim();
+        Patient patient = new Patient(
+                null,
+                normalizedDocumentType,
+                normalizedDocumentNumber,
+                birthDate,
+                normalizeNullable(phone),
+                normalizeNullable(address)
+        );
+        if (insurance != null) {
+            patient.setInsurance(insurance.trim());
+        }
+        if (userId != null) {
+            patient.linkUser(userId);
+        }
+        return patientMapper.toResponse(
+                userId == null ? patientRepository.save(patient) : patientRepository.saveAndFlush(patient)
+        );
     }
 
     private String normalizeNullable(String value) {

@@ -17,7 +17,7 @@ spring:
     properties:
       hibernate:
         jdbc:
-          time_zone: UTC
+          time_zone: America/Lima
   flyway:
     enabled: true
     locations: classpath:db/migration

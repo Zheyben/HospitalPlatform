@@ -1062,3 +1062,38 @@ clean pilot environment is presented as usable.
 - Only DEC-001, DEC-002, DEC-006, DEC-007, DEC-009 and DEC-019 are newly closed by explicit B.1.1 human approval dated 2026-09-29.
 - Future tables or documentary mentions are not treated as implemented functionality.
 - `git diff --check` and file-scope verification are required before closing B.1.
+
+## 10. C1-A.2 closure addendum for C1-B (2026-09-30)
+
+This dated addendum governs **only the C1-B domain-hardening scope**. Earlier B.1.1 inventory and
+historical gate text above describe the state at that time; they are not a current implementation
+claim. These approvals change decisions, not Java, SQL, PostgreSQL, endpoints or frontend behavior.
+
+| ID | State for C1-B | Approved rule |
+|---|---|---|
+| C1A2-03 | `CLOSED` | Documentary identity is unique by `(document_type, document_number)`, including inactive patient records. `DNI`, `CE`, `PASSPORT` are the allowed persisted types. The same number may exist under different types. Minor DNI is derived from `birthDate` and age under 18, never a document type. Replace the existing global number uniqueness only in a future, validated migration. |
+| C1A2-19 | `CLOSED` policy; execution pending | Preserve the 14 existing invalid DNI patients and the professional with license `DEMO-CMP-0001`. A future traceable migration must record each existing PK → unique, valid synthetic replacement while preserving UUIDs, relations, appointments and history. No manual data repair. |
+| C1A2-21 / DEC-010 | `CLOSED` for ordinary past-appointment operations | Ordinary `CONFIRM`, `CANCEL` and `RESCHEDULE` must reject past appointments. This closes only that bounded rule; other lifecycle windows remain outside C1-B and no administrative exception is authorized. |
+| C1A2-22 | `CLOSED` | A professional account with `users.enabled=false` cannot perform new operations, receive new reservations or start attention. Keep the professional profile, appointments and history. The development seed must use an enabled linked account if it is offered for new demo reservations. |
+| C1A2-23 | `CLOSED` | Reject professional deactivation/revocation while an appointment is in `CHECK_IN`, `WAITING` or `IN_ATTENTION`. An inactive specialty blocks new associations, operative schedules and reservations; existing appointments remain and may complete normally. Preserve history. |
+| C1A2-20 | `CLOSED — APPROVED FOR IMPLEMENTATION` | Active schedules and inactive schedules retaining future reservations must not allow conflicting professional capacity. The PostgreSQL 16.15 candidate, gateway and runtime-role design passed the C1A2-20.2 isolated validation. This closes the **design decision**, not the implementation. |
+
+Prior C1-A.2 approvals remain: no overlap between active schedules of the same professional and
+weekday even across specialties; `[start,end)` permits adjacency; deactivation preserves existing
+appointments and blocks conflicting capacity until it is resolved; structural edits must preserve
+history; slots last 30 minutes and `COMPLETED` consumes capacity; ordinary cancellation and
+rescheduling are rejected at `CHECK_IN`, `WAITING` and `IN_ATTENTION`; correction of patient document
+type/number is ADMIN-only and keeps `patientId`; insurance remains required free text; deactivating
+the last active ADMIN or directly removing PATIENT/PROFESSIONAL roles with linked profiles is blocked.
+The business zone remains configurable IANA time, initially `America/Lima`.
+
+**C1A2-20 design gate:** `CLOSED — APPROVED FOR IMPLEMENTATION` on 2026-09-30 for the academic project.
+Evidence: `docs/architecture/C1-A2-20-POSTGRESQL-CAPACITY-DESIGN.md`,
+`docs/architecture/C1-A2-20-POSTGRESQL-VALIDATION-REPORT.md`,
+`docs/architecture/validation/C1-A2-20-CANDIDATE.sql`,
+`docs/architecture/validation/C1-A2-20-GATEWAY.sql`,
+`docs/architecture/validation/C1-A2-20-RUNTIME-ROLE.sql` and
+`docs/architecture/validation/C1-A2-20-REMEDIATION-VALIDATE.py`.
+Validation used PostgreSQL 16.15, 15 two-session races with zero `40P01`, V4 upgrade and clean
+install, Java/SQL Lima boundary checks, and Hibernate validate. The implementation, production
+role cutover and migration remain separate work under C1-B.

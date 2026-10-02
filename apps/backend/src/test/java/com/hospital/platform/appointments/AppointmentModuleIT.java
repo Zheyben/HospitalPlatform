@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hospital.platform.appointments.dto.CreateAppointmentRequestDTO;
-import com.hospital.platform.appointments.exception.ProfessionalNotAvailableException;
 import com.hospital.platform.appointments.exception.SlotUnavailableException;
 import com.hospital.platform.appointments.service.AppointmentService;
 import java.util.List;
@@ -27,9 +26,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -90,12 +89,8 @@ class AppointmentModuleIT {
 
     @BeforeEach
     void setUpData() {
-        jdbcTemplate.update("delete from appointments");
-        jdbcTemplate.update("delete from availability_slots");
-        jdbcTemplate.update("delete from schedules");
-        jdbcTemplate.update("delete from patients");
-        jdbcTemplate.update("delete from professionals");
-        jdbcTemplate.update("delete from specialties");
+        jdbcTemplate.execute("truncate table appointments, availability_slots, schedules, "
+                + "professional_specialties, patients, professionals, specialties cascade");
 
         jdbcTemplate.update(
                 "insert into specialties (id, name) values (?, ?)",
@@ -105,7 +100,7 @@ class AppointmentModuleIT {
         jdbcTemplate.update(
                 "insert into professionals (id, license_number) values (?, ?)",
                 PROFESSIONAL_ID,
-                "CMP-APPOINTMENT-001"
+                "910004"
         );
         jdbcTemplate.update(
                 "insert into patients (id, document_type, document_number) values (?, 'DNI', ?), (?, 'DNI', ?)",
@@ -114,14 +109,17 @@ class AppointmentModuleIT {
                 PATIENT_B_ID,
                 "90000002"
         );
+        jdbcTemplate.update("insert into professional_specialties(professional_id,specialty_id) values (?,?)",
+                PROFESSIONAL_ID, SPECIALTY_ID);
         insertSchedule(ACTIVE_SCHEDULE_ID, true);
         insertSchedule(INACTIVE_SCHEDULE_ID, false);
         insertSlot(CREATE_SLOT_ID, ACTIVE_SCHEDULE_ID, "09:00", "AVAILABLE");
         insertSlot(ROLLBACK_SLOT_ID, ACTIVE_SCHEDULE_ID, "10:00", "AVAILABLE");
         insertSlot(CONCURRENT_SLOT_ID, ACTIVE_SCHEDULE_ID, "11:00", "AVAILABLE");
-        insertSlot(RESERVED_SLOT_ID, ACTIVE_SCHEDULE_ID, "12:00", "RESERVED");
+        insertSlot(RESERVED_SLOT_ID, ACTIVE_SCHEDULE_ID, "12:00", "AVAILABLE");
+        jdbcTemplate.queryForObject("select capacity_reserve(?,?,?)", UUID.class,
+                RESERVED_SLOT_ID, PATIENT_B_ID, "Existing reservation");
         insertSlot(BLOCKED_SLOT_ID, ACTIVE_SCHEDULE_ID, "13:00", "BLOCKED");
-        insertSlot(INACTIVE_SLOT_ID, INACTIVE_SCHEDULE_ID, "14:00", "AVAILABLE");
     }
 
     @AfterEach
@@ -143,7 +141,7 @@ class AppointmentModuleIT {
 
         assertThat(appointmentCount(CREATE_SLOT_ID)).isEqualTo(1);
         assertThat(slotStatus(CREATE_SLOT_ID)).isEqualTo("RESERVED");
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("3");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("5");
     }
 
     @Test
@@ -166,6 +164,21 @@ class AppointmentModuleIT {
                         .content("{\"slotId\":\"" + CREATE_SLOT_ID + "\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value("APPOINTMENT_ACCESS_DENIED"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void preservesNotFoundAndUnavailableContractsWithCapacityLocks() throws Exception {
+        mockMvc.perform(post("/appointments/{id}/confirm", UUID.randomUUID()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("APPOINTMENT_NOT_FOUND"));
+        UUID appointmentId = jdbcTemplate.queryForObject("select id from appointments where slot_id=?",
+                UUID.class, RESERVED_SLOT_ID);
+        mockMvc.perform(post("/appointments/{id}/reschedule", appointmentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"slotId\":\"" + UUID.randomUUID() + "\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("SLOT_UNAVAILABLE"));
     }
 
     @Test
@@ -196,7 +209,7 @@ class AppointmentModuleIT {
         assertAppointmentInsertViolatesForeignKey(PATIENT_A_ID, missingReference, CREATE_SLOT_ID);
         assertAppointmentInsertViolatesForeignKey(PATIENT_A_ID, PROFESSIONAL_ID, missingReference);
 
-        assertThat(jdbcTemplate.queryForObject("select count(*) from appointments", Integer.class)).isZero();
+        assertThat(appointmentCount(CREATE_SLOT_ID)).isZero();
     }
 
     @Test
@@ -206,7 +219,7 @@ class AppointmentModuleIT {
 
         try {
             assertThatThrownBy(() -> appointmentService.createAppointment(request(ROLLBACK_SLOT_ID, PATIENT_A_ID)))
-                    .isInstanceOf(JpaSystemException.class);
+                    .isInstanceOf(DataAccessException.class);
         } finally {
             dropRejectingInsertTrigger();
         }
@@ -221,7 +234,7 @@ class AppointmentModuleIT {
         authenticateAdmin();
 
         assertThatThrownBy(() -> appointmentService.createAppointment(request(CREATE_SLOT_ID, PATIENT_A_ID)))
-                .isInstanceOf(ProfessionalNotAvailableException.class);
+                .isInstanceOf(SlotUnavailableException.class);
 
         assertThat(slotStatus(CREATE_SLOT_ID)).isEqualTo("AVAILABLE");
         assertThat(appointmentCount(CREATE_SLOT_ID)).isZero();
@@ -290,7 +303,7 @@ class AppointmentModuleIT {
         jdbcTemplate.update(
                 "insert into schedules "
                         + "(id, professional_id, specialty_id, day_of_week, start_time, end_time, active) "
-                        + "values (?, ?, ?, 1, time '09:00', time '16:00', ?)",
+                        + "values (?, ?, ?, 2, time '09:00', time '16:00', ?)",
                 scheduleId,
                 PROFESSIONAL_ID,
                 SPECIALTY_ID,

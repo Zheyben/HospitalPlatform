@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Hospital de Huaycán</title>
+    <link rel="stylesheet" href="../Estilos/Estilos.css">
+</head>
+<body class="dashboard-body">
+    <!-- BARRA SUPERIOR ADMIN -->
+    <header class="navbar-new">
+        <div class="logo-container">
+            <img src="../Imagenes/hospital-de-huaycan-logo.jpg" alt="Logo" class="logo-img">
+            <span class="brand-name">Hospital de Huaycán</span>
+        </div>
+        
+        <div class="user-profile-widget-right">
+            <div class="user-avatar" style="background-color: #1e3a8a;"></div>
+            <div class="user-info-right">
+                <span class="user-name">SISTEMA ADMINISTRATIVO</span>
+                <div class="role-logout-container">
+                    <span class="user-role">Administrador</span>
+                    <a href="Index.html" class="logout-link" style="font-size: 0.75rem;">Cerrar cuenta</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard-container" style="max-width: 1100px;">
+        <div class="dashboard-header" style="background: linear-gradient(90deg, var(--light-bg), #dbeafe); padding: 2rem; border-radius: 15px; border-left: 5px solid #1e3a8a; margin-bottom: 2rem;">
+            <h2 style="font-size: 1.8rem; margin-bottom: 0.5rem; color: #1e3a8a;">Panel de Administración (Control Central)</h2>
+            <p style="color: var(--text-gray); font-size: 1.05rem;">Gestiona la reasignación de citas canceladas y aprueba los accesos del personal médico.</p>
+        </div>
+
+        <!-- MÓDULO 1: GESTIÓN DE CITAS Y COLA DE ESPERA -->
+        <section class="clean-card" style="margin-bottom: 2rem; padding: 2rem; border-top: 4px solid #1e3a8a;">
+            <h3>Monitor de Citas y Lista de Espera</h3>
+            <p style="margin-bottom: 1.5rem;">Citas recientes. Si un paciente cancela, puedes notificar y asignar el cupo al siguiente en la cola.</p>
+            
+            <div class="table-responsive">
+                <table class="clean-table">
+                    <thead>
+                        <tr>
+                            <th>Paciente Original</th>
+                            <th>Médico y Especialidad</th>
+                            <th>Fecha y Hora</th>
+                            <th>Estado</th>
+                            <th>Acción del Sistema</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Ana López (DNI: 76543210)</td>
+                            <td>Dr. Mendoza (Cardiología)</td>
+                            <td>20 Oct 2026 - 10:00 AM</td>
+                            <td><span class="status-badge status-cancelled">Cancelada</span></td>
+                            <td>
+                                <button class="btn-outline btn-small">Reasignar cupo y notificar</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Carlos Ruiz (DNI: 45678912)</td>
+                            <td>Dra. Salinas (Pediatría)</td>
+                            <td>20 Oct 2026 - 11:30 AM</td>
+                            <td><span class="status-badge status-active">Confirmada</span></td>
+                            <td><span style="color: var(--text-gray); font-size: 0.9rem;">Sin acción requerida</span></td>
+                        </tr>
+                        <tr>
+                            <td>María Gómez (DNI: 12345678)</td>
+                            <td>Dr. Pineda (Odontología)</td>
+                            <td>21 Oct 2026 - 09:00 AM</td>
+                            <td><span class="status-badge status-pending">Pendiente de pago</span></td>
+                            <td><span style="color: var(--text-gray); font-size: 0.9rem;">Esperando al paciente</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- MÓDULO 2: APROBACIÓN DE MÉDICOS -->
+        <section class="clean-card" style="padding: 2rem; border-top: 4px solid #1e3a8a;">
+            <h3>Aprobación de Cuentas (Profesionales de la Salud)</h3>
+            <p style="margin-bottom: 1.5rem;">Verifica la identidad y el CMP de los médicos registrados antes de permitirles el acceso al sistema. <em>(Nota: Los pacientes se aprueban automáticamente).</em></p>
+            
+            <div class="table-responsive">
+                <table class="clean-table">
+                    <thead>
+                        <tr>
+                            <th>Nombre del Profesional</th>
+                            <th>Especialidad</th>
+                            <th>DNI / CMP</th>
+                            <th>Decisión</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Dr. Luis Alvarado Torres</td>
+                            <td>Medicina General</td>
+                            <td>45678912 / CMP: 90812</td>
+                            <td>
+                                <div style="display: flex; gap: 10px;">
+                                    <button class="btn-success btn-small">Admitir</button>
+                                    <button class="btn-danger btn-small">Denegar</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Dra. Carmen Ríos Silva</td>
+                            <td>Gineco-Obstetricia</td>
+                            <td>72345618 / CMP: 87451</td>
+                            <td>
+                                <div style="display: flex; gap: 10px;">
+                                    <button class="btn-success btn-small">Admitir</button>
+                                    <button class="btn-danger btn-small">Denegar</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

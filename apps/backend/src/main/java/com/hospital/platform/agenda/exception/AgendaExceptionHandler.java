@@ -41,12 +41,18 @@ public class AgendaExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, exception.getMessage(), "INVALID_SCHEDULE_TIME");
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<AgendaErrorResponseDTO> handleInvalidAssociation(IllegalArgumentException exception) {
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), "INVALID_PROFESSIONAL_SPECIALTY_ASSOCIATION");
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<AgendaErrorResponseDTO> handleDataIntegrityViolation(
             DataIntegrityViolationException exception
     ) {
         if (!isSpecialtyForeignKeyViolation(exception)) {
-            throw exception;
+            return error(HttpStatus.CONFLICT, "Schedule conflicts with active or protected capacity",
+                    "AGENDA_CAPACITY_CONFLICT");
         }
         return error(
                 HttpStatus.BAD_REQUEST,

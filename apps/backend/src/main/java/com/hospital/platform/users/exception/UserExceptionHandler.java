@@ -3,6 +3,7 @@ package com.hospital.platform.users.exception;
 import com.hospital.platform.users.controller.UserController;
 import com.hospital.platform.users.dto.UserErrorResponseDTO;
 import java.time.Instant;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -35,6 +36,12 @@ public class UserExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<UserErrorResponseDTO> handleAccessDenied(AccessDeniedException exception) {
         return error(HttpStatus.FORBIDDEN, "Access denied", "ACCESS_DENIED");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<UserErrorResponseDTO> handleDomainConflict(DataIntegrityViolationException exception) {
+        return error(HttpStatus.CONFLICT, "User change conflicts with a linked role or active care",
+                "USER_DOMAIN_CONFLICT");
     }
 
     private ResponseEntity<UserErrorResponseDTO> error(HttpStatus status, String message, String errorCode) {

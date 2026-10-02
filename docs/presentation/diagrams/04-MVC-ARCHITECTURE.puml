@@ -1,0 +1,43 @@
+@startuml
+title Aplicación del patrón MVC en HOSPITALPLATFORM
+hide footbox
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontColor #123B52
+skinparam ArrowColor #1E5A78
+skinparam participantBackgroundColor #E9F3F7
+skinparam participantBorderColor #1E5A78
+skinparam sequenceMessageAlign center
+
+actor "Paciente" as Patient
+participant "VIEW\nNext.js pages y componentes" as View
+participant "Next.js Route Handlers\n/api/session/*, /api/patient/*" as Proxy
+participant "CONTROLLER REST\nAuthController / AgendaController\nAppointmentController" as Controller
+participant "MODEL / BUSINESS\nDTOs, Services, Entities" as Model
+participant "Repository\nSpring Data JPA" as Repository
+database "PostgreSQL 16" as DB
+
+Patient -> View : registro, login, disponibilidad, cita
+View -> Proxy : fetch al mismo origen
+Proxy -> Controller : HTTP /api/v1
+Controller -> Model : DTO y validación
+Model -> Model : reglas y transacción
+Model -> Repository : consulta / persistencia
+Repository -> DB : JPA / JDBC
+DB --> Repository : filas
+Repository --> Model : entidades
+Model --> Controller : Response DTO
+Controller --> Proxy : JSON + estado HTTP
+Proxy --> View : respuesta
+View --> Patient : estado visible
+
+note over View, Controller
+  La vista está desacoplada en Next.js;
+  Spring expone controladores REST.
+end note
+note over Controller
+  PatientController también existe en la API;
+  este recorrido usa Auth, Agenda y Appointment.
+end note
+@enduml

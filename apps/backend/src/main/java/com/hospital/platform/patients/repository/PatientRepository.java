@@ -14,9 +14,9 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
 
     Optional<Patient> findByUserIdAndDeletedAtIsNull(UUID userId);
 
-    boolean existsByDocumentNumberIgnoreCase(String documentNumber);
+    boolean existsByDocumentTypeAndDocumentNumber(String documentType, String documentNumber);
 
-    boolean existsByDocumentNumberIgnoreCaseAndIdNot(String documentNumber, UUID id);
+    boolean existsByDocumentTypeAndDocumentNumberAndIdNot(String documentType, String documentNumber, UUID id);
 
     boolean existsByUserIdAndIdNot(UUID userId, UUID id);
 }

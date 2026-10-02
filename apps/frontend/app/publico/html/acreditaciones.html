@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acreditaciones - Hospital de Huaycán</title>
+    <link rel="stylesheet" href="../Estilos/Estilos.css">
+    <style>
+        .acreditacion-item {
+            background-color: white;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            transition: transform 0.2s;
+        }
+        .acreditacion-item:hover {
+            transform: translateX(10px);
+            border-left: 5px solid var(--primary-blue);
+        }
+        .acreditacion-title {
+            font-size: 1.3rem;
+            color: var(--dark-blue);
+            margin-bottom: 0.8rem;
+            font-weight: 700;
+        }
+        .acreditacion-desc {
+            color: var(--text-gray);
+            line-height: 1.6;
+            font-size: 1.05rem;
+        }
+    </style>
+</head>
+<body class="dashboard-body">
+    <!-- BARRA SUPERIOR PÚBLICA -->
+    <header class="navbar-new">
+        <div class="logo-container">
+            <a href="Index.html" style="text-decoration: none; display: flex; align-items: center;">
+                <img src="../Imagenes/hospital-de-huaycan-logo.jpg" alt="Logo" class="logo-img">
+                <span class="brand-name">Hospital de Huaycán</span>
+            </a>
+        </div>
+        
+        <div class="nav-actions-new">
+            <a href="Index.html" class="btn-text">Volver al Inicio</a>
+            <a href="login.html" class="login-link">Iniciar sesión</a>
+        </div>
+    </header>
+
+    <main class="dashboard-container" style="max-width: 900px; padding: 2rem;">
+        <h1 style="font-size: 2.2rem; margin-bottom: 2rem; color: var(--text-dark); text-align: center;">Nuestras Acreditaciones</h1>
+        
+        <div class="acreditaciones-lista">
+            
+            <div class="acreditacion-item">
+                <div class="acreditacion-title">Acreditación MINSA Nivel III-1</div>
+                <div class="acreditacion-desc">
+                    Reconocimiento otorgado por el Ministerio de Salud (MINSA) que certifica al Hospital de Huaycán como una institución de salud de alta complejidad, cumpliendo con todos los estándares nacionales en atención hospitalaria y quirúrgica.
+                </div>
+            </div>
+
+            <div class="acreditacion-item">
+                <div class="acreditacion-title">Certificación ISO 9001:2015</div>
+                <div class="acreditacion-desc">
+                    Certificación internacional que avala nuestro sistema de gestión de calidad en los procesos administrativos y de atención al paciente, asegurando eficiencia y mejora continua en todos los servicios.
+                </div>
+            </div>
+
+            <div class="acreditacion-item">
+                <div class="acreditacion-title">Hospital Amigo de la Madre y el Niño</div>
+                <div class="acreditacion-desc">
+                    Distinción otorgada por la Organización Mundial de la Salud (OMS) y UNICEF por nuestro firme compromiso con la lactancia materna exclusiva y el cuidado integral durante la etapa neonatal.
+                </div>
+            </div>
+
+            <div class="acreditacion-item">
+                <div class="acreditacion-title">Sello de Gestión Ambiental Hospitalaria</div>
+                <div class="acreditacion-desc">
+                    Acreditación en prácticas ecológicas y manejo responsable de residuos biomédicos, garantizando la seguridad de nuestro personal, nuestros pacientes y el medio ambiente de la comunidad de Huaycán.
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+</body>
+</html>

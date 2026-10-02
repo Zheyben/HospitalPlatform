@@ -4,6 +4,7 @@ import com.hospital.platform.appointments.controller.AppointmentController;
 import com.hospital.platform.appointments.dto.AppointmentErrorResponseDTO;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -38,6 +39,19 @@ public class AppointmentExceptionHandler {
         return error(HttpStatus.CONFLICT, "Availability slot is unavailable", "SLOT_UNAVAILABLE");
     }
 
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<AppointmentErrorResponseDTO> handleCapacityViolation(DataIntegrityViolationException exception) {
+        String detail = exception.getMostSpecificCause().getMessage();
+        if (detail != null && detail.contains("Appointment missing")) {
+            return error(HttpStatus.NOT_FOUND, "Appointment not found", "APPOINTMENT_NOT_FOUND");
+        }
+        if (detail != null && (detail.contains("SLOT_UNAVAILABLE") || detail.contains("New slot missing"))) {
+            return error(HttpStatus.CONFLICT, "Availability slot is unavailable", "SLOT_UNAVAILABLE");
+        }
+        return error(HttpStatus.CONFLICT, "Appointment operation conflicts with current capacity or state",
+                "APPOINTMENT_CAPACITY_CONFLICT");
+    }
+
     @ExceptionHandler(InvalidAppointmentTransitionException.class)
     ResponseEntity<AppointmentErrorResponseDTO> handleInvalidAppointmentTransition(
             InvalidAppointmentTransitionException exception
@@ -57,17 +71,6 @@ public class AppointmentExceptionHandler {
                 HttpStatus.CONFLICT,
                 "Appointment already has a rescheduled successor",
                 "APPOINTMENT_SUCCESSOR_EXISTS"
-        );
-    }
-
-    @ExceptionHandler(AppointmentSlotReleaseException.class)
-    ResponseEntity<AppointmentErrorResponseDTO> handleAppointmentSlotRelease(
-            AppointmentSlotReleaseException exception
-    ) {
-        return error(
-                HttpStatus.CONFLICT,
-                "Availability slot could not be released",
-                "APPOINTMENT_SLOT_RELEASE_FAILED"
         );
     }
 

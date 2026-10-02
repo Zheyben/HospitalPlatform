@@ -1,5 +1,7 @@
 package com.hospital.platform.patients.dto;
 
+import com.hospital.platform.patients.domain.DocumentIdentity;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
@@ -22,4 +24,8 @@ public record UpdatePatientRequestDTO(
 
         String address
 ) {
+    @AssertTrue(message = "Document type or number is invalid")
+    public boolean isDocumentIdentityValid() {
+        return DocumentIdentity.isValid(documentType, documentNumber);
+    }
 }

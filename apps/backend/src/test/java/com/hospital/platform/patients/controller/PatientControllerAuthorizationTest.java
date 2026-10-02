@@ -37,7 +37,7 @@ class PatientControllerAuthorizationTest {
     @Test
     @WithMockUser(roles = "PATIENT")
     void allowsPatientToReadOwnProfile() {
-        PatientResponseDTO response = new PatientResponseDTO(null, null, "DNI", "12345678", null, null, null, true);
+        PatientResponseDTO response = new PatientResponseDTO(null, null, "DNI", "12345678", null, null, null, null, true);
         when(patientService.findCurrentPatient()).thenReturn(response);
 
         assertThat(patientController.findCurrentPatient()).isSameAs(response);

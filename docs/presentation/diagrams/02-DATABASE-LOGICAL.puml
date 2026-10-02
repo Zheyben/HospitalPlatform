@@ -1,0 +1,105 @@
+@startuml
+title HOSPITALPLATFORM | Modelo lógico de datos
+left to right direction
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontColor #123B52
+skinparam ArrowColor #1E5A78
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam entity {
+  BackgroundColor #F7FAFC
+  BorderColor #1E5A78
+  FontColor #123B52
+  FontSize 15
+}
+
+entity "User" as User {
+  * id <<PK>>
+  --
+  username <<UQ>>
+  email <<UQ>>
+  firstName, lastName
+  enabled
+}
+entity "Role" as Role {
+  * id <<PK>>
+  --
+  name <<UQ>>
+}
+entity "UserRole" as UserRole {
+  * userId <<PK, FK>>
+  * roleId <<PK, FK>>
+}
+entity "Patient" as Patient {
+  * id <<PK>>
+  --
+  userId <<FK, UQ, optional>>
+  documentType + documentNumber <<UQ pair>>
+  birthDate, phone, insurance
+}
+entity "Professional" as Professional {
+  * id <<PK>>
+  --
+  userId <<FK, UQ, optional>>
+  licenseNumber <<UQ>>
+}
+entity "Specialty" as Specialty {
+  * id <<PK>>
+  --
+  name <<UQ>>
+  active
+}
+entity "ProfessionalSpecialty" as ProfessionalSpecialty {
+  * professionalId <<PK, FK>>
+  * specialtyId <<PK, FK>>
+}
+entity "Schedule" as Schedule {
+  * id <<PK>>
+  --
+  professionalId + specialtyId <<FK pair>>
+  dayOfWeek, startTime, endTime
+  active, capacityProtected
+}
+entity "AvailabilitySlot" as AvailabilitySlot {
+  * id <<PK>>
+  --
+  scheduleId <<FK>>
+  slotDate, startTime, endTime
+  status
+  scheduleId + slotDate + startTime <<UQ>>
+}
+entity "Appointment" as Appointment {
+  * id <<PK>>
+  --
+  patientId <<FK>>
+  professionalId <<FK>>
+  slotId <<FK>>
+  rescheduledFromId <<FK, UQ, optional>>
+  appointmentStatus, flowStage
+  reason
+}
+
+User ||--o{ UserRole
+Role ||--o{ UserRole
+User "0..1" -- "0..1" Patient
+User "0..1" -- "0..1" Professional
+Professional ||--o{ ProfessionalSpecialty
+Specialty ||--o{ ProfessionalSpecialty
+ProfessionalSpecialty ||--o{ Schedule : par autorizado
+Schedule ||--o{ AvailabilitySlot
+Patient ||--o{ Appointment
+Professional ||--o{ Appointment
+AvailabilitySlot ||--o{ Appointment : historial
+Appointment "0..1" -- "0..1" Appointment : sucesora
+
+note bottom of Schedule
+  V5 excluye horarios solapados del mismo profesional
+  cuando active o capacityProtected es verdadero.
+end note
+note bottom of Appointment
+  V5 permite como máximo una cita SCHEDULED,
+  CONFIRMED o COMPLETED por slot.
+end note
+@enduml

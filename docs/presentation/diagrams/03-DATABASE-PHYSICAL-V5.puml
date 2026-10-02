@@ -1,0 +1,271 @@
+@startuml
+title HOSPITALPLATFORM | Modelo físico PostgreSQL V5 (vista completa)
+left to right direction
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontColor #123B52
+skinparam ArrowColor #1E5A78
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam entity {
+  BackgroundColor #F7FAFC
+  BorderColor #1E5A78
+  FontColor #123B52
+  FontSize 13
+}
+
+
+entity "users" as users {
+  id : uuid [PK]
+  username : varchar[100] [UQ]
+  email : varchar[255] [UQ]
+  password_hash : text
+  first_name : varchar[100] [NULL]
+  last_name : varchar[100] [NULL]
+  enabled : boolean
+  deleted_at : timestamp [NULL]
+  created_at : timestamp
+  updated_at : timestamp
+  --
+  CHECK email y username canónicos
+}
+
+entity "roles" as roles {
+  id : uuid [PK]
+  name : varchar[50] [UQ]
+  description : text [NULL]
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "user_roles" as user_roles {
+  user_id : uuid [PK, FK]
+  role_id : uuid [PK, FK]
+}
+
+entity "patients" as patients {
+  id : uuid [PK]
+  user_id : uuid [FK, UQ, NULL]
+  document_type : varchar[50]
+  document_number : varchar[50]
+  birth_date : date [NULL]
+  phone : varchar[50] [NULL]
+  address : text [NULL]
+  deleted_at : timestamp [NULL]
+  created_at : timestamp
+  updated_at : timestamp
+  insurance : varchar[150] [NULL]
+  --
+  UNIQUE (document_type, document_number)
+  CHECK DNI / CE / PASSPORT válido
+}
+
+entity "professionals" as professionals {
+  id : uuid [PK]
+  user_id : uuid [FK, UQ, NULL]
+  license_number : varchar[100] [UQ]
+  deleted_at : timestamp [NULL]
+  created_at : timestamp
+  updated_at : timestamp
+  --
+  CHECK license_number: 4 a 6 dígitos
+}
+
+entity "specialties" as specialties {
+  id : uuid [PK]
+  name : varchar[150] [UQ]
+  description : text [NULL]
+  active : boolean
+  deleted_at : timestamp [NULL]
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "professional_specialties" as professional_specialties {
+  professional_id : uuid [PK, FK]
+  specialty_id : uuid [PK, FK]
+}
+
+entity "schedules" as schedules {
+  id : uuid [PK]
+  professional_id : uuid [FK]
+  specialty_id : uuid [FK]
+  day_of_week : integer
+  start_time : time
+  end_time : time
+  active : boolean
+  created_at : timestamp
+  updated_at : timestamp
+  capacity_protected : boolean
+  --
+  CHECK day_of_week 0..6; end_time > start_time
+  EXCLUDE profesional + día + intervalo
+  active OR capacity_protected
+}
+
+entity "availability_slots" as availability_slots {
+  id : uuid [PK]
+  schedule_id : uuid [FK]
+  slot_date : date
+  start_time : time
+  end_time : time
+  status : varchar[30]
+  created_at : timestamp
+  updated_at : timestamp
+  --
+  CHECK status AVAILABLE / RESERVED / BLOCKED
+  CHECK duración = 30 min
+  UNIQUE (schedule_id, slot_date, start_time)
+  EXCLUDE solapamiento por schedule + fecha
+}
+
+entity "appointments" as appointments {
+  id : uuid [PK]
+  patient_id : uuid [FK]
+  professional_id : uuid [FK]
+  slot_id : uuid [FK]
+  appointment_status : varchar[30]
+  flow_stage : varchar[30] [NULL]
+  reason : text [NULL]
+  cancelled_at : timestamp [NULL]
+  cancelled_by : uuid [FK, NULL]
+  created_at : timestamp
+  updated_at : timestamp
+  rescheduled_from_id : uuid [FK, UQ, NULL]
+  --
+  CHECK appointment_status / flow_stage
+  UNIQUE parcial slot_id: SCHEDULED / CONFIRMED / COMPLETED
+  UNIQUE rescheduled_from_id; CHECK no autorreferencia
+}
+
+entity "permissions" as permissions {
+  id : uuid [PK]
+  name : varchar[100] [UQ]
+  description : text [NULL]
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+entity "role_permissions" as role_permissions {
+  role_id : uuid [PK, FK]
+  permission_id : uuid [PK, FK]
+}
+
+entity "refresh_tokens" as refresh_tokens {
+  id : uuid [PK]
+  user_id : uuid [FK]
+  token_hash : varchar[255] [UQ]
+  expires_at : timestamp
+  revoked_at : timestamp [NULL]
+  created_at : timestamp
+}
+
+entity "audit_logs" as audit_logs {
+  id : uuid [PK]
+  user_id : uuid [FK, NULL]
+  action : varchar[100]
+  entity_name : varchar[100]
+  entity_id : uuid [NULL]
+  old_values : jsonb [NULL]
+  new_values : jsonb [NULL]
+  ip_address : varchar[100] [NULL]
+  user_agent : text [NULL]
+  created_at : timestamp
+}
+
+entity "waitlist_entries" as waitlist_entries {
+  id : uuid [PK]
+  patient_id : uuid [FK]
+  specialty_id : uuid [FK]
+  professional_id : uuid [FK, NULL]
+  priority_level : varchar[30] [NULL]
+  status : varchar[30]
+  created_at : timestamp
+  --
+  CHECK status ACTIVE / NOTIFIED / COMPLETED / CANCELLED
+}
+
+entity "priority_requests" as priority_requests {
+  id : uuid [PK]
+  appointment_id : uuid [FK]
+  requested_by : uuid [FK]
+  reason : text
+  status : varchar[30]
+  reviewed_by : uuid [FK, NULL]
+  created_at : timestamp
+  updated_at : timestamp
+  --
+  CHECK status REQUESTED / UNDER_REVIEW / APPROVED / REJECTED
+}
+
+entity "hospital_business_config" as hospital_business_config {
+  singleton : boolean [PK]
+  zone_name : text
+  --
+  CHECK singleton; zona America/Lima por trigger
+}
+
+users "0..1" -- "0..*" appointments : cancelled_by
+
+patients "1" -- "0..*" appointments : patient_id
+
+professionals "1" -- "0..*" appointments : professional_id
+
+availability_slots "1" -- "0..*" appointments : slot_id
+
+appointments "0..1" -- "0..1" appointments : rescheduled_from_id
+
+users "0..1" -- "0..*" audit_logs : user_id
+
+schedules "1" -- "0..*" availability_slots : schedule_id
+
+users "0..1" -- "0..1" patients : user_id
+
+appointments "1" -- "0..*" priority_requests : appointment_id
+
+users "1" -- "0..*" priority_requests : requested_by
+
+users "0..1" -- "0..*" priority_requests : reviewed_by
+
+professionals "1" -- "0..*" professional_specialties : professional_id
+
+specialties "1" -- "0..*" professional_specialties : specialty_id
+
+users "0..1" -- "0..1" professionals : user_id
+
+users "1" -- "0..*" refresh_tokens : user_id
+
+permissions "1" -- "0..*" role_permissions : permission_id
+
+roles "1" -- "0..*" role_permissions : role_id
+
+professional_specialties "1" -- "0..*" schedules : professional_id, specialty_id
+
+professionals "1" -- "0..*" schedules : professional_id
+
+specialties "1" -- "0..*" schedules : specialty_id
+
+roles "1" -- "0..*" user_roles : role_id
+
+users "1" -- "0..*" user_roles : user_id
+
+patients "1" -- "0..*" waitlist_entries : patient_id
+
+professionals "0..1" -- "0..*" waitlist_entries : professional_id
+
+specialties "1" -- "0..*" waitlist_entries : specialty_id
+
+note bottom of appointments
+  V5: triggers diferidos verifican coherencia
+  entre cita ocupante y slot RESERVED.
+end note
+
+note bottom of hospital_business_config
+  El resto de restricciones de V5 incluye
+  guards transaccionales y de desactivación.
+end note
+
+footer PostgreSQL V5 | 17 tablas | varchar[n] equivale a varchar(n) en PostgreSQL
+
+@enduml

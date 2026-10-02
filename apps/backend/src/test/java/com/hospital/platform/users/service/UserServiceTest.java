@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.hospital.platform.agenda.contract.CapacityGateway;
 import com.hospital.platform.users.dto.AssignRoleRequestDTO;
 import com.hospital.platform.users.dto.CreateUserRequestDTO;
 import com.hospital.platform.users.dto.UpdateUserRequestDTO;
@@ -51,11 +52,14 @@ class UserServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private CapacityGateway capacityGateway;
+
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, roleRepository, passwordEncoder, new UserMapper());
+        userService = new UserService(userRepository, roleRepository, passwordEncoder, new UserMapper(), capacityGateway);
     }
 
     @Test
@@ -79,6 +83,35 @@ class UserServiceTest {
         assertThat(userCaptor.getValue().getPasswordHash()).isNotEqualTo("plain-password");
         assertThat(userCaptor.getValue().getEmail()).isEqualTo("admin@example.com");
         assertThat(response.roles()).containsExactly("ADMIN");
+    }
+
+    @Test
+    void registersPatientWithOnlyPatientRoleAndEncodedPassword() {
+        Role patientRole = role(RoleName.PATIENT);
+        when(passwordEncoder.encode("plain-password")).thenReturn("encoded-password");
+        when(roleRepository.findByNameIn(Set.of("PATIENT"))).thenReturn(List.of(patientRole));
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User user = userService.registerPatientUser(
+                " PATIENT@Example.com ", "plain-password", " Ana ", " Pérez "
+        );
+
+        assertThat(user.getEmail()).isEqualTo("patient@example.com");
+        assertThat(user.getUsername()).startsWith("patient-");
+        assertThat(user.getPasswordHash()).isEqualTo("encoded-password");
+        assertThat(user.getFirstName()).isEqualTo("Ana");
+        assertThat(user.getLastName()).isEqualTo("Pérez");
+        assertThat(user.getRoles()).extracting(Role::getName).containsExactly("PATIENT");
+    }
+
+    @Test
+    void registrationRejectsDuplicateEmailBeforeEncodingPassword() {
+        when(userRepository.existsByEmailIgnoreCase("patient@example.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.registerPatientUser(
+                "patient@example.com", "plain-password", "Ana", "Pérez"
+        )).isInstanceOf(DuplicateEmailException.class);
+        verify(passwordEncoder, never()).encode(any());
     }
 
     @Test
@@ -168,6 +201,8 @@ class UserServiceTest {
     void disablesUserAccount() {
         User user = user();
         when(userRepository.findActiveByIdWithRoles(USER_ID)).thenReturn(Optional.of(user));
+        org.mockito.Mockito.doAnswer(call -> { user.changeStatus(false); return null; })
+                .when(capacityGateway).setUserEnabled(USER_ID, false);
 
         UserResponseDTO response = userService.updateStatus(
                 USER_ID,
@@ -176,6 +211,7 @@ class UserServiceTest {
 
         assertThat(user.isEnabled()).isFalse();
         assertThat(response.enabled()).isFalse();
+        verify(capacityGateway).setUserEnabled(USER_ID, false);
     }
 
     @Test

@@ -3,16 +3,66 @@ package com.hospital.platform.auth.exception;
 import com.hospital.platform.auth.controller.AuthController;
 import com.hospital.platform.auth.dto.AuthErrorResponseDTO;
 import com.hospital.platform.security.exception.JwtConfigurationException;
+import com.hospital.platform.patients.exception.DuplicateDocumentException;
+import com.hospital.platform.patients.exception.InvalidDocumentException;
+import com.hospital.platform.users.exception.DuplicateEmailException;
+import com.hospital.platform.users.exception.RoleNotFoundException;
 import java.time.Instant;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(assignableTypes = AuthController.class)
 public class AuthExceptionHandler {
+
+    @ExceptionHandler(DuplicateEmailException.class)
+    ResponseEntity<AuthErrorResponseDTO> handleDuplicateEmail(DuplicateEmailException exception) {
+        return error(HttpStatus.CONFLICT, "Email already exists", "EMAIL_ALREADY_EXISTS");
+    }
+
+    @ExceptionHandler(DuplicateDocumentException.class)
+    ResponseEntity<AuthErrorResponseDTO> handleDuplicateDocument(DuplicateDocumentException exception) {
+        return error(HttpStatus.CONFLICT, "Patient document already exists", "DUPLICATE_DOCUMENT");
+    }
+
+    @ExceptionHandler(InvalidDocumentException.class)
+    ResponseEntity<AuthErrorResponseDTO> handleInvalidDocument(InvalidDocumentException exception) {
+        return error(HttpStatus.BAD_REQUEST, "Document type or number is invalid", "VALIDATION_ERROR");
+    }
+
+    @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
+    ResponseEntity<AuthErrorResponseDTO> handleInvalidRequest(Exception exception) {
+        return error(HttpStatus.BAD_REQUEST, "Request validation failed", "VALIDATION_ERROR");
+    }
+
+    @ExceptionHandler(RoleNotFoundException.class)
+    ResponseEntity<AuthErrorResponseDTO> handleMissingRole(RoleNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, "Role not found", "ROLE_NOT_FOUND");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<AuthErrorResponseDTO> handleIntegrityViolation(DataIntegrityViolationException exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
+                String constraint = violation.getConstraintName();
+                if ("users_email_key".equals(constraint)) {
+                    return error(HttpStatus.CONFLICT, "Email already exists", "EMAIL_ALREADY_EXISTS");
+                }
+                if ("uq_patients_document_identity".equals(constraint)) {
+                    return error(HttpStatus.CONFLICT, "Patient document already exists", "DUPLICATE_DOCUMENT");
+                }
+            }
+            cause = cause.getCause();
+        }
+        return error(HttpStatus.CONFLICT, "Registration conflicts with existing data", "REGISTRATION_CONFLICT");
+    }
 
     @ExceptionHandler(AuthenticationException.class)
     ResponseEntity<AuthErrorResponseDTO> handleAuthenticationException(AuthenticationException exception) {

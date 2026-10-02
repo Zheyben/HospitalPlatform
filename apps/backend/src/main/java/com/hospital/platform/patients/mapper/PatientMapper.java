@@ -16,6 +16,7 @@ public class PatientMapper {
                 patient.getDocumentNumber(),
                 patient.getBirthDate(),
                 patient.getPhone(),
+                patient.getInsurance(),
                 patient.getAddress(),
                 patient.isActive()
         );

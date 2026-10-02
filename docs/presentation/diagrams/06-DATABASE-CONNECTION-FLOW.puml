@@ -1,0 +1,51 @@
+@startuml
+title Conexión y persistencia de datos
+hide footbox
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontColor #123B52
+skinparam ArrowColor #1E5A78
+skinparam participantBackgroundColor #E9F3F7
+skinparam participantBorderColor #1E5A78
+skinparam sequenceMessageAlign center
+
+actor "Browser" as Browser
+participant "Next.js\n127.0.0.1:3000" as Next
+participant "Route Handlers\n/api/session/*, /api/patient/*" as Proxy
+participant "Spring Boot REST\nhost :18080 / contenedor :8080" as Spring
+participant "Service" as Service
+participant "Spring Data JPA\nHibernate ORM" as ORM
+participant "JDBC\nDriver PostgreSQL" as JDBC
+database "PostgreSQL 16 Docker\nhost :55432 / postgres:5432\nhospital_platform" as PG
+
+== Solicitud del paciente ==
+Browser -> Next : HTTP
+Next -> Proxy : fetch mismo origen
+Proxy -> Spring : BACKEND_URL / JWT
+Spring -> Service : reglas de negocio
+Service -> ORM : Repository
+ORM -> JDBC : SQL
+JDBC -> PG : SQL por red Docker
+PG --> JDBC : filas
+JDBC --> ORM : resultados
+ORM --> Service : resultado
+Service --> Spring : DTO
+Spring --> Proxy : JSON + estado
+Proxy --> Browser : respuesta
+
+== Arranque del backend ==
+participant "Flyway" as Flyway
+collections "Migraciones\nV1 · V2 · V3 · V4 · V5" as Migrations
+Flyway -> Migrations : V1 → V2 → V3 → V4 → V5
+Migrations -> PG : aplica cada migración en orden
+
+note over Service, JDBC
+  La reserva usa CapacityGateway y JdbcTemplate
+  directamente sobre JDBC.
+end note
+note over Spring, PG
+  La contraseña y el secreto JWT se leen del entorno;
+  no se incluyen en el diagrama.
+end note
+@enduml

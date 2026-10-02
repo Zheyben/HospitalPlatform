@@ -3,6 +3,8 @@ package com.hospital.platform;
 import com.hospital.platform.auth.repository.RefreshTokenRepository;
 import com.hospital.platform.agenda.repository.AvailabilitySlotRepository;
 import com.hospital.platform.agenda.repository.ScheduleRepository;
+import com.hospital.platform.agenda.contract.CapacityGateway;
+import com.hospital.platform.agenda.contract.PostgresCapacityGateway;
 import com.hospital.platform.appointments.repository.AppointmentRepository;
 import com.hospital.platform.patients.repository.PatientRepository;
 import com.hospital.platform.professionals.repository.ProfessionalRepository;
@@ -71,6 +73,16 @@ class HospitalPlatformApplicationTests {
         @Bean
         AppointmentRepository appointmentRepository() {
             return Mockito.mock(AppointmentRepository.class);
+        }
+
+        @Bean
+        org.springframework.jdbc.core.JdbcTemplate jdbcTemplate() {
+            return Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class);
+        }
+
+        @Bean
+        jakarta.persistence.EntityManager entityManager() {
+            return Mockito.mock(jakarta.persistence.EntityManager.class);
         }
     }
 }

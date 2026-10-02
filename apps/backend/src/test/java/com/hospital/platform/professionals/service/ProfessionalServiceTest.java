@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.hospital.platform.agenda.contract.CapacityGateway;
 import com.hospital.platform.professionals.dto.CreateProfessionalRequestDTO;
 import com.hospital.platform.professionals.dto.ProfessionalResponseDTO;
 import com.hospital.platform.professionals.dto.UpdateProfessionalRequestDTO;
@@ -32,11 +33,14 @@ class ProfessionalServiceTest {
     @Mock
     private ProfessionalRepository professionalRepository;
 
+    @Mock
+    private CapacityGateway capacityGateway;
+
     private ProfessionalService professionalService;
 
     @BeforeEach
     void setUp() {
-        professionalService = new ProfessionalService(professionalRepository);
+        professionalService = new ProfessionalService(professionalRepository, capacityGateway);
     }
 
     @Test
@@ -44,22 +48,22 @@ class ProfessionalServiceTest {
         when(professionalRepository.save(any(Professional.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProfessionalResponseDTO response = professionalService.createProfessional(
-                new CreateProfessionalRequestDTO(USER_ID, " CMP-123 ")
+                new CreateProfessionalRequestDTO(USER_ID, " 01234 ")
         );
         ArgumentCaptor<Professional> professionalCaptor = ArgumentCaptor.forClass(Professional.class);
 
         verify(professionalRepository).save(professionalCaptor.capture());
-        assertThat(professionalCaptor.getValue().getLicenseNumber()).isEqualTo("CMP-123");
-        assertThat(response.licenseNumber()).isEqualTo("CMP-123");
+        assertThat(professionalCaptor.getValue().getLicenseNumber()).isEqualTo("01234");
+        assertThat(response.licenseNumber()).isEqualTo("01234");
         assertThat(response.userId()).isEqualTo(USER_ID);
     }
 
     @Test
     void rejectsDuplicatedLicense() {
-        when(professionalRepository.existsByLicenseNumberIgnoreCase("CMP-123")).thenReturn(true);
+        when(professionalRepository.existsByLicenseNumberIgnoreCase("01234")).thenReturn(true);
 
         assertThatThrownBy(() -> professionalService.createProfessional(
-                new CreateProfessionalRequestDTO(null, "CMP-123")
+                new CreateProfessionalRequestDTO(null, "01234")
         )).isInstanceOf(DuplicateProfessionalException.class);
     }
 
@@ -100,22 +104,22 @@ class ProfessionalServiceTest {
 
         ProfessionalResponseDTO response = professionalService.updateProfessional(
                 PROFESSIONAL_ID,
-                new UpdateProfessionalRequestDTO("CMP-456")
+                new UpdateProfessionalRequestDTO("04567")
         );
 
-        assertThat(response.licenseNumber()).isEqualTo("CMP-456");
-        assertThat(professional.getLicenseNumber()).isEqualTo("CMP-456");
+        assertThat(response.licenseNumber()).isEqualTo("04567");
+        assertThat(professional.getLicenseNumber()).isEqualTo("04567");
     }
 
     @Test
     void rejectsDuplicatedLicenseWhenUpdating() {
         Professional professional = professional();
         when(professionalRepository.findByIdAndDeletedAtIsNull(PROFESSIONAL_ID)).thenReturn(Optional.of(professional));
-        when(professionalRepository.existsByLicenseNumberIgnoreCaseAndIdNot("CMP-456", PROFESSIONAL_ID)).thenReturn(true);
+        when(professionalRepository.existsByLicenseNumberIgnoreCaseAndIdNot("04567", PROFESSIONAL_ID)).thenReturn(true);
 
         assertThatThrownBy(() -> professionalService.updateProfessional(
                 PROFESSIONAL_ID,
-                new UpdateProfessionalRequestDTO("CMP-456")
+                new UpdateProfessionalRequestDTO("04567")
         )).isInstanceOf(DuplicateProfessionalException.class);
     }
 
@@ -123,6 +127,9 @@ class ProfessionalServiceTest {
     void appliesSoftDeleteWhenProfessionalIsDeactivated() {
         Professional professional = professional();
         when(professionalRepository.findByIdAndDeletedAtIsNull(PROFESSIONAL_ID)).thenReturn(Optional.of(professional));
+        when(professionalRepository.findById(PROFESSIONAL_ID)).thenReturn(Optional.of(professional));
+        org.mockito.Mockito.doAnswer(call -> { professional.deactivate(); return null; })
+                .when(capacityGateway).deactivateProfessional(PROFESSIONAL_ID);
 
         ProfessionalResponseDTO response = professionalService.deactivateProfessional(PROFESSIONAL_ID);
 
@@ -131,6 +138,6 @@ class ProfessionalServiceTest {
     }
 
     private Professional professional() {
-        return new Professional(PROFESSIONAL_ID, USER_ID, "CMP-123");
+        return new Professional(PROFESSIONAL_ID, USER_ID, "01234");
     }
 }

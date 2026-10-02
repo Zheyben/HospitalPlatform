@@ -1,0 +1,106 @@
+@startchen
+skinparam nodesep 10
+skinparam ranksep 10
+title HOSPITALPLATFORM — Modelo conceptual de datos\nHospitalPlatform · Notación Chen
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam defaultFontColor #123B52
+skinparam ArrowColor #1E5A78
+
+entity "Usuario" as USUARIO {
+  "ID usuario" as id_usuario <<key>>
+  "Correo" as correo
+  "Nombre y apellido" as nombre
+}
+entity "Rol" as ROL {
+  "ID rol" as id_rol <<key>>
+  "Nombre" as nombre_rol
+}
+entity "Paciente" as PACIENTE {
+  "ID paciente" as id_paciente <<key>>
+  "Tipo de documento" as tipo_documento
+  "Número de documento" as numero_documento
+  "Fecha de nacimiento" as fecha_nacimiento
+  "Seguro" as seguro
+}
+entity "Profesional" as PROFESIONAL {
+  "ID profesional" as id_profesional <<key>>
+  "Número de colegiatura" as numero_colegiatura
+  "Estado" as estado_profesional
+}
+entity "Especialidad" as ESPECIALIDAD {
+  "ID especialidad" as id_especialidad <<key>>
+  "Nombre" as nombre_especialidad
+  "Estado" as estado_especialidad
+}
+entity "Horario semanal" as HORARIO {
+  "ID horario" as id_horario <<key>>
+  "Día de semana" as dia_semana
+  "Hora de inicio" as inicio_horario
+  "Hora de fin" as fin_horario
+  "Activo" as activo_horario
+}
+entity "Slot de agenda" as SLOT {
+  "ID slot" as id_slot <<key>>
+  "Fecha" as fecha_slot
+  "Hora de inicio" as inicio_slot
+  "Hora de fin" as fin_slot
+  "Estado" as estado_slot
+}
+entity "Cita" as CITA {
+  "ID cita" as id_cita <<key>>
+  "Estado de cita" as estado_cita
+  "Motivo" as motivo
+}
+
+relationship "tiene" as TIENE_ROL {
+}
+USUARIO -(1,N)- TIENE_ROL
+TIENE_ROL -(0,N)- ROL
+
+relationship "identifica" as IDENTIFICA_PACIENTE {
+}
+USUARIO -(0,1)- IDENTIFICA_PACIENTE
+IDENTIFICA_PACIENTE -(0,1)- PACIENTE
+
+relationship "identifica" as IDENTIFICA_PROFESIONAL {
+}
+USUARIO -(0,1)- IDENTIFICA_PROFESIONAL
+IDENTIFICA_PROFESIONAL -(0,1)- PROFESIONAL
+
+relationship "ejerce" as EJERCE {
+}
+PROFESIONAL -(0,N)- EJERCE
+EJERCE -(0,N)- ESPECIALIDAD
+
+relationship "define" as DEFINE {
+}
+PROFESIONAL -(0,N)- DEFINE
+DEFINE -(1,1)- HORARIO
+
+relationship "clasifica" as CLASIFICA {
+}
+ESPECIALIDAD -(0,N)- CLASIFICA
+CLASIFICA -(1,1)- HORARIO
+
+relationship "genera" as GENERA {
+}
+HORARIO -(0,N)- GENERA
+GENERA -(1,1)- SLOT
+
+relationship "reserva" as RESERVA {
+}
+PACIENTE -(0,N)- RESERVA
+RESERVA -(1,1)- CITA
+
+relationship "atiende" as ATIENDE {
+}
+PROFESIONAL -(0,N)- ATIENDE
+ATIENDE -(1,1)- CITA
+
+relationship "ocupa" as OCUPA {
+}
+CITA -(1,1)- OCUPA
+OCUPA -(0,N)- SLOT
+@endchen

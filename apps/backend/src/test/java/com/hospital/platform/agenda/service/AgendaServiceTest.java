@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 
+import com.hospital.platform.agenda.contract.CapacityGateway;
 import com.hospital.platform.agenda.dto.AgendaResponseDTO;
 import com.hospital.platform.agenda.dto.AvailabilitySlotResponseDTO;
 import com.hospital.platform.agenda.dto.CreateAgendaRequestDTO;
@@ -22,6 +24,7 @@ import com.hospital.platform.agenda.repository.ScheduleRepository;
 import com.hospital.platform.professionals.contract.ProfessionalLookupService;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,6 +54,9 @@ class AgendaServiceTest {
     @Mock
     private ProfessionalLookupService professionalLookupService;
 
+    @Mock
+    private CapacityGateway capacityGateway;
+
     private AgendaService agendaService;
 
     @BeforeEach
@@ -58,21 +64,24 @@ class AgendaServiceTest {
         agendaService = new AgendaService(
                 scheduleRepository,
                 availabilitySlotRepository,
-                professionalLookupService
+                professionalLookupService,
+                Clock.systemUTC(),
+                capacityGateway
         );
     }
 
     @Test
     void createsAgendaForActiveProfessional() {
         when(professionalLookupService.existsActiveProfessional(PROFESSIONAL_ID)).thenReturn(true);
-        when(scheduleRepository.save(any(Schedule.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(capacityGateway.isOperationalAssociation(PROFESSIONAL_ID, SPECIALTY_ID)).thenReturn(true);
+        when(capacityGateway.createSchedule(PROFESSIONAL_ID, SPECIALTY_ID, 1, START_TIME, END_TIME))
+                .thenReturn(AGENDA_ID);
+        when(scheduleRepository.findById(AGENDA_ID)).thenReturn(Optional.of(schedule()));
 
         AgendaResponseDTO response = agendaService.createAgenda(createRequest());
-        ArgumentCaptor<Schedule> scheduleCaptor = ArgumentCaptor.forClass(Schedule.class);
-
-        verify(scheduleRepository).save(scheduleCaptor.capture());
-        assertThat(scheduleCaptor.getValue().getProfessionalId()).isEqualTo(PROFESSIONAL_ID);
-        assertThat(scheduleCaptor.getValue().getSpecialtyId()).isEqualTo(SPECIALTY_ID);
+        verify(capacityGateway).createSchedule(PROFESSIONAL_ID, SPECIALTY_ID, 1, START_TIME, END_TIME);
+        assertThat(response.professionalId()).isEqualTo(PROFESSIONAL_ID);
+        assertThat(response.specialtyId()).isEqualTo(SPECIALTY_ID);
         assertThat(response.active()).isTrue();
     }
 
@@ -123,6 +132,7 @@ class AgendaServiceTest {
         Schedule schedule = schedule();
         when(scheduleRepository.findById(AGENDA_ID)).thenReturn(Optional.of(schedule));
         when(professionalLookupService.existsActiveProfessional(PROFESSIONAL_ID)).thenReturn(true);
+        when(capacityGateway.isOperationalAssociation(PROFESSIONAL_ID, SPECIALTY_ID)).thenReturn(true);
         UpdateAgendaRequestDTO request = new UpdateAgendaRequestDTO(
                 PROFESSIONAL_ID,
                 SPECIALTY_ID,
@@ -130,6 +140,10 @@ class AgendaServiceTest {
                 LocalTime.of(13, 0),
                 LocalTime.of(17, 0)
         );
+        doAnswer(call -> { schedule.updateConfiguration(PROFESSIONAL_ID, SPECIALTY_ID, 2,
+                LocalTime.of(13, 0), LocalTime.of(17, 0)); return null; })
+                .when(capacityGateway).reconfigureSchedule(AGENDA_ID, PROFESSIONAL_ID, SPECIALTY_ID, 2,
+                        LocalTime.of(13, 0), LocalTime.of(17, 0));
 
         AgendaResponseDTO response = agendaService.updateAgenda(AGENDA_ID, request);
 
@@ -141,6 +155,8 @@ class AgendaServiceTest {
     void changesAgendaStatus() {
         Schedule schedule = schedule();
         when(scheduleRepository.findById(AGENDA_ID)).thenReturn(Optional.of(schedule));
+        doAnswer(call -> { schedule.changeStatus(false); return null; })
+                .when(capacityGateway).scheduleStatus(AGENDA_ID, false);
 
         AgendaResponseDTO response = agendaService.changeAgendaStatus(AGENDA_ID, false);
 

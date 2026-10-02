@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -23,31 +22,31 @@ public interface AvailabilitySlotRepository extends JpaRepository<AvailabilitySl
             """)
     Optional<AvailabilitySlot> findByIdWithSchedule(@Param("slotId") UUID slotId);
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
-            update availability_slots slot
-            set status = 'RESERVED',
-                updated_at = current_timestamp
-            where slot.id = :slotId
-              and slot.status = 'AVAILABLE'
-              and exists (
-                  select 1
-                  from schedules schedule
-                  where schedule.id = slot.schedule_id
-                    and schedule.active = true
-              )
+            select slot.id as id, slot.schedule_id as scheduleId, slot.slot_date as slotDate,
+                   slot.start_time as startTime, slot.end_time as endTime, slot.status as status,
+                   s.professional_id as professionalId, s.specialty_id as specialtyId,
+                   coalesce(nullif(trim(concat(coalesce(u.first_name, ''), ' ',
+                       coalesce(u.last_name, ''))), ''), p.license_number) as professionalName,
+                   sp.name as specialtyName
+            from availability_slots slot
+            join schedules s on s.id = slot.schedule_id and s.active = true
+            join professionals p on p.id = s.professional_id and p.deleted_at is null
+            left join users u on u.id = p.user_id and u.deleted_at is null
+            join specialties sp on sp.id = s.specialty_id and sp.active = true and sp.deleted_at is null
+            where slot.status = 'AVAILABLE'
+              and (p.user_id is null or u.enabled = true)
+              and (slot.slot_date > :today or (slot.slot_date = :today and slot.start_time > :nowTime))
+              and (cast(:scheduleId as uuid) is null or s.id = :scheduleId)
+              and (cast(:professionalId as uuid) is null or s.professional_id = :professionalId)
+              and (cast(:slotDate as date) is null or slot.slot_date = :slotDate)
+              and not exists (select 1 from appointments a where a.slot_id = slot.id
+                              and a.appointment_status in ('SCHEDULED', 'CONFIRMED', 'COMPLETED'))
+            order by slot.slot_date, slot.start_time, sp.name, professionalName
             """, nativeQuery = true)
-    int reserveUsableSlot(@Param("slotId") UUID slotId);
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(value = """
-            update availability_slots
-            set status = 'AVAILABLE',
-                updated_at = current_timestamp
-            where id = :slotId
-              and status = 'RESERVED'
-            """, nativeQuery = true)
-    int releaseReservedSlot(@Param("slotId") UUID slotId);
+    List<PatientAvailabilityRow> findPatientAvailability(@Param("scheduleId") UUID scheduleId,
+            @Param("professionalId") UUID professionalId, @Param("slotDate") LocalDate slotDate,
+            @Param("today") LocalDate today, @Param("nowTime") java.time.LocalTime nowTime);
 
     @Query("""
             select slot

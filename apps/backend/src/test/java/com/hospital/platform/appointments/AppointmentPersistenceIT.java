@@ -5,6 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.hospital.platform.appointments.entity.Appointment;
 import com.hospital.platform.appointments.repository.AppointmentRepository;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.Date;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -20,6 +28,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -75,12 +84,8 @@ class AppointmentPersistenceIT {
 
     @BeforeEach
     void setUpData() {
-        jdbcTemplate.update("delete from appointments");
-        jdbcTemplate.update("delete from availability_slots");
-        jdbcTemplate.update("delete from schedules");
-        jdbcTemplate.update("delete from patients");
-        jdbcTemplate.update("delete from professionals");
-        jdbcTemplate.update("delete from specialties");
+        jdbcTemplate.execute("truncate table appointments, availability_slots, schedules, "
+                + "professional_specialties, patients, professionals, specialties cascade");
 
         jdbcTemplate.update(
                 "insert into specialties (id, name) values (?, ?)",
@@ -90,13 +95,15 @@ class AppointmentPersistenceIT {
         jdbcTemplate.update(
                 "insert into professionals (id, license_number) values (?, ?)",
                 PROFESSIONAL_ID,
-                "CMP-APPOINTMENT-PERSISTENCE"
+                "910005"
         );
         jdbcTemplate.update(
                 "insert into patients (id, document_type, document_number) values (?, 'DNI', ?)",
                 PATIENT_ID,
                 "91000001"
         );
+        jdbcTemplate.update("insert into professional_specialties (professional_id, specialty_id) values (?, ?)",
+                PROFESSIONAL_ID, SPECIALTY_ID);
         jdbcTemplate.update(
                 "insert into schedules "
                         + "(id, professional_id, specialty_id, day_of_week, start_time, end_time, active) "
@@ -113,28 +120,27 @@ class AppointmentPersistenceIT {
     }
 
     @Test
-    void appliesFlywayV3AndExposesTheExpectedSchema() {
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("3");
+    void appliesFlywayV5AndExposesTheExpectedSchema() {
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("5");
         assertThat(columnExists("appointments", "rescheduled_from_id")).isTrue();
         assertThat(constraintExists("appointments_slot_id_key")).isFalse();
         assertThat(constraintExists("fk_appointments_rescheduled_from")).isTrue();
         assertThat(constraintExists("uq_appointments_rescheduled_from")).isTrue();
-        assertThat(indexDefinition("uq_appointments_active_slot"))
+        assertThat(indexDefinition("uq_appointments_occupied_slot"))
                 .contains("UNIQUE INDEX")
                 .contains("slot_id")
                 .contains("appointment_status")
                 .contains("SCHEDULED")
-                .contains("CONFIRMED");
+                .contains("CONFIRMED")
+                .contains("COMPLETED");
         assertThat(tableExists("users")).isTrue();
         assertThat(tableExists("refresh_tokens")).isTrue();
     }
 
     @Test
     void mapsNullableAndPresentPredecessorsAndFindsTheSuccessor() {
-        UUID originalId = UUID.randomUUID();
-        UUID successorId = UUID.randomUUID();
-        insertAppointment(originalId, SLOT_A_ID, "RESCHEDULED", null);
-        insertAppointment(successorId, SLOT_B_ID, "SCHEDULED", originalId);
+        UUID originalId = reserve(SLOT_A_ID);
+        UUID successorId = reschedule(originalId, SLOT_B_ID);
 
         Appointment original = appointmentRepository.findById(originalId).orElseThrow();
         Appointment successor = appointmentRepository.findById(successorId).orElseThrow();
@@ -148,13 +154,9 @@ class AppointmentPersistenceIT {
 
     @Test
     void allowsOneDirectSuccessorAndSupportsAReschedulingChain() {
-        UUID appointmentA = UUID.randomUUID();
-        UUID appointmentB = UUID.randomUUID();
-        UUID appointmentC = UUID.randomUUID();
-
-        insertAppointment(appointmentA, SLOT_A_ID, "RESCHEDULED", null);
-        insertAppointment(appointmentB, SLOT_B_ID, "RESCHEDULED", appointmentA);
-        insertAppointment(appointmentC, SLOT_C_ID, "SCHEDULED", appointmentB);
+        UUID appointmentA = reserve(SLOT_A_ID);
+        UUID appointmentB = reschedule(appointmentA, SLOT_B_ID);
+        UUID appointmentC = reschedule(appointmentB, SLOT_C_ID);
 
         assertThat(appointmentRepository.findByRescheduledFromId(appointmentA))
                 .map(Appointment::getId)
@@ -163,50 +165,35 @@ class AppointmentPersistenceIT {
                 .map(Appointment::getId)
                 .contains(appointmentC);
 
-        assertThatThrownBy(() -> insertAppointment(
-                UUID.randomUUID(),
-                SLOT_D_ID,
-                "SCHEDULED",
-                appointmentA
-        )).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> reschedule(appointmentA, SLOT_D_ID))
+                .isInstanceOf(DataAccessException.class);
     }
 
     @Test
     void rejectsMissingAndSelfPredecessorReferences() {
-        assertThatThrownBy(() -> insertAppointment(
-                UUID.randomUUID(),
-                SLOT_A_ID,
-                "SCHEDULED",
-                UUID.randomUUID()
-        )).isInstanceOf(DataIntegrityViolationException.class);
-
-        UUID selfReferencedId = UUID.randomUUID();
-        assertThatThrownBy(() -> insertAppointment(
-                selfReferencedId,
-                SLOT_B_ID,
-                "SCHEDULED",
-                selfReferencedId
-        )).isInstanceOf(DataIntegrityViolationException.class);
+        UUID appointmentId = reserve(SLOT_A_ID);
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "update appointments set rescheduled_from_id=? where id=?", UUID.randomUUID(), appointmentId))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "update appointments set rescheduled_from_id=? where id=?", appointmentId, appointmentId))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
     void rejectsTwoActiveAppointmentsForTheSameSlot() {
-        insertAppointment(UUID.randomUUID(), SLOT_A_ID, "SCHEDULED", null);
-
-        assertThatThrownBy(() -> insertAppointment(
-                UUID.randomUUID(),
-                SLOT_A_ID,
-                "CONFIRMED",
-                null
-        )).isInstanceOf(DataIntegrityViolationException.class);
+        reserve(SLOT_A_ID);
+        assertThatThrownBy(() -> reserve(SLOT_A_ID)).isInstanceOf(DataAccessException.class);
     }
 
     @Test
     void allowsSlotReuseAfterCancellationAndRescheduling() {
-        insertAppointment(UUID.randomUUID(), SLOT_A_ID, "CANCELLED", null);
-        insertAppointment(UUID.randomUUID(), SLOT_A_ID, "SCHEDULED", null);
-        insertAppointment(UUID.randomUUID(), SLOT_B_ID, "RESCHEDULED", null);
-        insertAppointment(UUID.randomUUID(), SLOT_B_ID, "CONFIRMED", null);
+        UUID cancelled = reserve(SLOT_A_ID);
+        jdbcTemplate.queryForObject("select capacity_cancel(?, ?)", Object.class, cancelled, null);
+        reserve(SLOT_A_ID);
+        UUID rescheduled = reserve(SLOT_B_ID);
+        reschedule(rescheduled, SLOT_C_ID);
+        reserve(SLOT_B_ID);
 
         assertThat(appointmentCount(SLOT_A_ID)).isEqualTo(2);
         assertThat(appointmentCount(SLOT_B_ID)).isEqualTo(2);
@@ -214,8 +201,7 @@ class AppointmentPersistenceIT {
 
     @Test
     void obtainsAnAppointmentWithAPessimisticWriteLock() throws Exception {
-        UUID appointmentId = UUID.randomUUID();
-        insertAppointment(appointmentId, SLOT_A_ID, "SCHEDULED", null);
+        UUID appointmentId = reserve(SLOT_A_ID);
 
         CountDownLatch lockAcquired = new CountDownLatch(1);
         CountDownLatch releaseLock = new CountDownLatch(1);
@@ -291,7 +277,7 @@ class AppointmentPersistenceIT {
                     .load();
             latestFlyway.migrate();
 
-            assertThat(latestFlyway.info().current().getVersion().toString()).isEqualTo("3");
+            assertThat(latestFlyway.info().current().getVersion().toString()).isEqualTo("5");
             assertThat(migrationJdbc.queryForObject(
                     "select count(*) from " + schema + ".appointments where id = ?",
                     Integer.class,
@@ -321,41 +307,78 @@ class AppointmentPersistenceIT {
         jdbcTemplate.update(
                 "insert into availability_slots "
                         + "(id, schedule_id, slot_date, start_time, end_time, status) "
-                        + "values (?, ?, date '2030-10-02', cast(? as time), cast(? as time) + interval '30 minutes', "
-                        + "'RESERVED')",
+                        + "values (?, ?, ?, cast(? as time), cast(? as time) + interval '30 minutes', "
+                        + "'AVAILABLE')",
                 slotId,
                 SCHEDULE_ID,
+                Date.valueOf(nextMonday()),
                 startTime,
                 startTime
         );
     }
 
-    private void insertAppointment(UUID appointmentId, UUID slotId, String status, UUID rescheduledFromId) {
-        if (rescheduledFromId == null) {
-            jdbcTemplate.update(
-                    "insert into appointments "
-                            + "(id, patient_id, professional_id, slot_id, appointment_status, reason) "
-                            + "values (?, ?, ?, ?, ?, 'Persistence integration test')",
-                    appointmentId,
-                    PATIENT_ID,
-                    PROFESSIONAL_ID,
-                    slotId,
-                    status
-            );
-            return;
-        }
+    private UUID reserve(UUID slotId) {
+        return jdbcTemplate.queryForObject("select capacity_reserve(?, ?, ?)", UUID.class,
+                slotId, PATIENT_ID, "Persistence integration test");
+    }
 
-        jdbcTemplate.update(
-                "insert into appointments "
-                        + "(id, patient_id, professional_id, slot_id, appointment_status, reason, "
-                        + "rescheduled_from_id) values (?, ?, ?, ?, ?, 'Persistence integration test', ?)",
-                appointmentId,
-                PATIENT_ID,
-                PROFESSIONAL_ID,
-                slotId,
-                status,
-                rescheduledFromId
-        );
+    @Test
+    void upgradesSyntheticV4FixtureToV5WithoutLosingIdentityOrAppointment() throws Exception {
+        String database = "c1b_v4_upgrade_test";
+        jdbcTemplate.execute("drop database if exists " + database);
+        jdbcTemplate.execute("create database " + database);
+        try {
+            DriverManagerDataSource isolated = new DriverManagerDataSource(
+                    "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getMappedPort(5432)
+                            + "/" + database,
+                    postgres.getUsername(), postgres.getPassword());
+            JdbcTemplate fixtureJdbc = new JdbcTemplate(isolated);
+            Flyway v4 = Flyway.configure().dataSource(isolated)
+                    .locations("classpath:db/migration").target("4").load();
+            v4.migrate();
+
+            Path fixturePath = Path.of("..", "..", "docs", "architecture", "validation",
+                    "C1-B-V4-FIXTURE.sql");
+            if (!Files.exists(fixturePath)) {
+                fixturePath = Path.of("docs", "architecture", "validation", "C1-B-V4-FIXTURE.sql");
+            }
+            String fixture = Files.readString(fixturePath, StandardCharsets.UTF_8)
+                    .replaceAll("(?m)^--.*$", "");
+            for (String statement : fixture.split(";")) {
+                if (!statement.isBlank()) {
+                    fixtureJdbc.execute(statement);
+                }
+            }
+
+            Flyway latest = Flyway.configure().dataSource(isolated)
+                    .locations("classpath:db/migration").load();
+            latest.migrate();
+            assertThat(latest.info().current().getVersion().toString()).isEqualTo("5");
+            assertThat(fixtureJdbc.queryForObject("select count(*) from patients", Integer.class)).isEqualTo(14);
+            assertThat(fixtureJdbc.queryForObject("select document_number from patients where id=?",
+                    String.class, UUID.fromString("093e273b-43d9-4bb1-b275-c9bed2ccb358")))
+                    .isEqualTo("90000001");
+            assertThat(fixtureJdbc.queryForObject("select license_number from professionals where id=?",
+                    String.class, UUID.fromString("88743663-5b1b-3868-bf1a-aa0371adfac3")))
+                    .isEqualTo("900001");
+            assertThat(fixtureJdbc.queryForObject("select appointment_status from appointments where id=?",
+                    String.class, UUID.fromString("88888888-8888-8888-8888-888888888881")))
+                    .isEqualTo("SCHEDULED");
+            assertThat(fixtureJdbc.queryForObject("select status from availability_slots where id=?",
+                    String.class, UUID.fromString("77777777-7777-7777-7777-777777777771")))
+                    .isEqualTo("RESERVED");
+            assertThat(fixtureJdbc.queryForObject("select zone_name from hospital_business_config",
+                    String.class)).isEqualTo("America/Lima");
+            assertThat(fixtureJdbc.queryForObject("select to_regprocedure('capacity_lock_reschedule(uuid,uuid)') "
+                    + "is not null", Boolean.class)).isTrue();
+        } finally {
+            jdbcTemplate.execute("drop database if exists " + database + " with (force)");
+        }
+    }
+
+    private UUID reschedule(UUID appointmentId, UUID slotId) {
+        return jdbcTemplate.queryForObject("select capacity_reschedule(?, ?)", UUID.class,
+                appointmentId, slotId);
     }
 
     private void insertLegacyV2Data(
@@ -390,7 +413,7 @@ class AppointmentPersistenceIT {
         migrationJdbc.update("insert into " + schema + ".specialties (id, name) values (?, ?)",
                 specialtyId, "Legacy Specialty");
         migrationJdbc.update("insert into " + schema + ".professionals (id, license_number) values (?, ?)",
-                professionalId, "CMP-LEGACY-V2");
+                professionalId, "920001");
         migrationJdbc.update(
                 "insert into " + schema + ".patients (id, document_type, document_number) values (?, 'DNI', ?)",
                 patientId,
@@ -404,12 +427,16 @@ class AppointmentPersistenceIT {
                 professionalId,
                 specialtyId
         );
+        migrationJdbc.update("insert into " + schema
+                + ".professional_specialties (professional_id, specialty_id) values (?, ?)",
+                professionalId, specialtyId);
         migrationJdbc.update(
                 "insert into " + schema + ".availability_slots "
                         + "(id, schedule_id, slot_date, start_time, end_time, status) "
-                        + "values (?, ?, date '2030-10-03', time '09:00', time '09:30', 'RESERVED')",
+                        + "values (?, ?, ?, time '09:00', time '09:30', 'RESERVED')",
                 slotId,
-                scheduleId
+                scheduleId,
+                Date.valueOf(nextMonday())
         );
         migrationJdbc.update(
                 "insert into " + schema + ".appointments "
@@ -420,6 +447,10 @@ class AppointmentPersistenceIT {
                 professionalId,
                 slotId
         );
+    }
+
+    private LocalDate nextMonday() {
+        return LocalDate.now(ZoneId.of("America/Lima")).with(TemporalAdjusters.next(DayOfWeek.MONDAY));
     }
 
     private boolean columnExists(String tableName, String columnName) {

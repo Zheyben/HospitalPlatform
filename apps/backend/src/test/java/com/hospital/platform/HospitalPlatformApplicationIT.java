@@ -9,6 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hospital.platform.agenda.contract.AvailabilitySlotService;
+import java.sql.Date;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
@@ -45,6 +50,7 @@ class HospitalPlatformApplicationIT {
     private static final UUID AVAILABLE_INACTIVE_SLOT_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final UUID RESERVED_ACTIVE_SLOT_ID = UUID.fromString("22222222-2222-2222-2222-222222222223");
     private static final UUID BLOCKED_ACTIVE_SLOT_ID = UUID.fromString("22222222-2222-2222-2222-222222222224");
+    private static final UUID PATIENT_ID = UUID.fromString("66666666-6666-6666-6666-666666666663");
 
     @Container
     static final PostgreSQLContainer postgres = new PostgreSQLContainer(
@@ -74,12 +80,8 @@ class HospitalPlatformApplicationIT {
 
     @BeforeEach
     void setUpAgendaData() {
-        jdbcTemplate.update("delete from availability_slots where schedule_id in (?, ?)",
-                ACTIVE_SCHEDULE_ID, INACTIVE_SCHEDULE_ID);
-        jdbcTemplate.update("delete from schedules where id in (?, ?)",
-                ACTIVE_SCHEDULE_ID, INACTIVE_SCHEDULE_ID);
-        jdbcTemplate.update("delete from professionals where id = ?", PROFESSIONAL_ID);
-        jdbcTemplate.update("delete from specialties where id = ?", SPECIALTY_ID);
+        jdbcTemplate.execute("truncate table appointments, availability_slots, schedules, "
+                + "professional_specialties, patients, professionals, specialties cascade");
 
         jdbcTemplate.update(
                 "insert into specialties (id, name) values (?, ?)",
@@ -89,8 +91,12 @@ class HospitalPlatformApplicationIT {
         jdbcTemplate.update(
                 "insert into professionals (id, license_number) values (?, ?)",
                 PROFESSIONAL_ID,
-                "CMP-TEST-001"
+                "910001"
         );
+        jdbcTemplate.update("insert into patients (id, document_type, document_number) values (?, 'DNI', '90000003')",
+                PATIENT_ID);
+        jdbcTemplate.update("insert into professional_specialties (professional_id, specialty_id) values (?, ?)",
+                PROFESSIONAL_ID, SPECIALTY_ID);
         jdbcTemplate.update(
                 "insert into schedules "
                         + "(id, professional_id, specialty_id, day_of_week, start_time, end_time, active) "
@@ -102,7 +108,7 @@ class HospitalPlatformApplicationIT {
         jdbcTemplate.update(
                 "insert into schedules "
                         + "(id, professional_id, specialty_id, day_of_week, start_time, end_time, active) "
-                        + "values (?, ?, ?, 1, time '09:00', time '12:00', false)",
+                        + "values (?, ?, ?, 2, time '09:00', time '12:00', true)",
                 INACTIVE_SCHEDULE_ID,
                 PROFESSIONAL_ID,
                 SPECIALTY_ID
@@ -110,13 +116,16 @@ class HospitalPlatformApplicationIT {
 
         insertSlot(AVAILABLE_ACTIVE_SLOT_ID, ACTIVE_SCHEDULE_ID, "09:00", "AVAILABLE");
         insertSlot(AVAILABLE_INACTIVE_SLOT_ID, INACTIVE_SCHEDULE_ID, "09:00", "AVAILABLE");
-        insertSlot(RESERVED_ACTIVE_SLOT_ID, ACTIVE_SCHEDULE_ID, "10:00", "RESERVED");
+        jdbcTemplate.update("update schedules set active=false where id=?", INACTIVE_SCHEDULE_ID);
+        insertSlot(RESERVED_ACTIVE_SLOT_ID, ACTIVE_SCHEDULE_ID, "10:00", "AVAILABLE");
+        jdbcTemplate.queryForObject("select capacity_reserve(?,?,?)", UUID.class,
+                RESERVED_ACTIVE_SLOT_ID, PATIENT_ID, "Existing booking");
         insertSlot(BLOCKED_ACTIVE_SLOT_ID, ACTIVE_SCHEDULE_ID, "11:00", "BLOCKED");
     }
 
     @Test
     void contextLoadsAndAppliesMigrationsThroughRefreshTokens() {
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("3");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("5");
 
         Integer rolesTableCount = jdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables "
@@ -153,7 +162,7 @@ class HospitalPlatformApplicationIT {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void returnsControlledErrorForInvalidSpecialtyReference() throws Exception {
+    void returnsControlledErrorForMissingProfessionalSpecialtyAssociation() throws Exception {
         String request = """
                 {
                   "professionalId": "%s",
@@ -169,8 +178,8 @@ class HospitalPlatformApplicationIT {
                         .content(request))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Specialty reference is invalid"))
-                .andExpect(jsonPath("$.errorCode").value("INVALID_SPECIALTY_REFERENCE"));
+                .andExpect(jsonPath("$.message").value("Professional and specialty must have an active association"))
+                .andExpect(jsonPath("$.errorCode").value("INVALID_PROFESSIONAL_SPECIALTY_ASSOCIATION"));
     }
 
     @Test
@@ -189,12 +198,16 @@ class HospitalPlatformApplicationIT {
     }
 
     private void insertSlot(UUID slotId, UUID scheduleId, String startTime, String status) {
+        LocalDate nextDate = LocalDate.now(ZoneId.of("America/Lima")).with(
+                TemporalAdjusters.next(scheduleId.equals(INACTIVE_SCHEDULE_ID)
+                        ? DayOfWeek.TUESDAY : DayOfWeek.MONDAY));
         jdbcTemplate.update(
                 "insert into availability_slots "
                         + "(id, schedule_id, slot_date, start_time, end_time, status) "
-                        + "values (?, ?, date '2026-10-01', cast(? as time), cast(? as time) + interval '30 minutes', ?)",
+                        + "values (?, ?, ?, cast(? as time), cast(? as time) + interval '30 minutes', ?)",
                 slotId,
                 scheduleId,
+                Date.valueOf(nextDate),
                 startTime,
                 startTime,
                 status

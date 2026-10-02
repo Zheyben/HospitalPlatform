@@ -1,10 +1,12 @@
 package com.hospital.platform.professionals.service;
 
+import com.hospital.platform.agenda.contract.CapacityGateway;
 import com.hospital.platform.professionals.dto.CreateProfessionalRequestDTO;
 import com.hospital.platform.professionals.dto.ProfessionalResponseDTO;
 import com.hospital.platform.professionals.dto.UpdateProfessionalRequestDTO;
 import com.hospital.platform.professionals.entity.Professional;
 import com.hospital.platform.professionals.exception.DuplicateProfessionalException;
+import com.hospital.platform.professionals.exception.InvalidProfessionalLicenseException;
 import com.hospital.platform.professionals.exception.ProfessionalNotFoundException;
 import com.hospital.platform.professionals.mapper.ProfessionalMapper;
 import com.hospital.platform.professionals.repository.ProfessionalRepository;
@@ -18,10 +20,12 @@ public class ProfessionalService {
 
     private final ProfessionalRepository professionalRepository;
     private final ProfessionalMapper professionalMapper;
+    private final CapacityGateway capacityGateway;
 
-    public ProfessionalService(ProfessionalRepository professionalRepository) {
+    public ProfessionalService(ProfessionalRepository professionalRepository, CapacityGateway capacityGateway) {
         this.professionalRepository = professionalRepository;
         this.professionalMapper = new ProfessionalMapper();
+        this.capacityGateway = capacityGateway;
     }
 
     @Transactional
@@ -62,8 +66,13 @@ public class ProfessionalService {
     public ProfessionalResponseDTO deactivateProfessional(UUID professionalId) {
         Professional professional = findActiveProfessional(professionalId);
 
-        professional.deactivate();
-        return professionalMapper.toResponse(professional);
+        capacityGateway.deactivateProfessional(professionalId);
+        return professionalMapper.toResponse(findActiveOrInactiveProfessional(professionalId));
+    }
+
+    private Professional findActiveOrInactiveProfessional(UUID professionalId) {
+        return professionalRepository.findById(professionalId)
+                .orElseThrow(() -> new ProfessionalNotFoundException(professionalId));
     }
 
     private Professional findActiveProfessional(UUID professionalId) {
@@ -78,6 +87,10 @@ public class ProfessionalService {
     }
 
     private String normalizeLicenseNumber(String licenseNumber) {
-        return licenseNumber.trim();
+        String normalized = licenseNumber.trim();
+        if (!normalized.matches("[0-9]{4,6}")) {
+            throw new InvalidProfessionalLicenseException();
+        }
+        return normalized;
     }
 }

@@ -13,6 +13,11 @@ import com.hospital.platform.appointments.exception.SlotUnavailableException;
 import com.hospital.platform.appointments.service.AppointmentService;
 import com.hospital.platform.users.service.AuthenticatedUser;
 import java.net.URI;
+import java.sql.Date;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -92,14 +97,9 @@ class AppointmentLifecycleIT {
     @BeforeEach
     void setUpData() {
         dropFailureTriggers();
-        jdbcTemplate.update("delete from audit_logs");
-        jdbcTemplate.update("delete from appointments");
-        jdbcTemplate.update("delete from availability_slots");
-        jdbcTemplate.update("delete from schedules");
-        jdbcTemplate.update("delete from patients");
-        jdbcTemplate.update("delete from professionals");
-        jdbcTemplate.update("delete from specialties");
-        jdbcTemplate.update("delete from users");
+        jdbcTemplate.execute("truncate table audit_logs, appointments, availability_slots, schedules, "
+                + "professional_specialties, patients, professionals, specialties, refresh_tokens, "
+                + "user_roles, users cascade");
 
         jdbcTemplate.update(
                 "insert into users (id, username, email, password_hash) values (?, ?, ?, ?)",
@@ -123,8 +123,10 @@ class AppointmentLifecycleIT {
                 "insert into professionals (id, user_id, license_number) values (?, ?, ?)",
                 PROFESSIONAL_ID,
                 USER_ID,
-                "CMP-LIFECYCLE-001"
+                "910003"
         );
+        jdbcTemplate.update("insert into professional_specialties (professional_id, specialty_id) values (?, ?)",
+                PROFESSIONAL_ID, SPECIALTY_ID);
         jdbcTemplate.update(
                 "insert into schedules "
                         + "(id, professional_id, specialty_id, day_of_week, start_time, end_time, active) "
@@ -133,7 +135,7 @@ class AppointmentLifecycleIT {
                 PROFESSIONAL_ID,
                 SPECIALTY_ID
         );
-        insertSlot(SLOT_A_ID, "08:00", "RESERVED");
+        insertSlot(SLOT_A_ID, "08:00", "AVAILABLE");
         insertSlot(SLOT_B_ID, "09:00", "AVAILABLE");
         insertSlot(SLOT_C_ID, "10:00", "AVAILABLE");
         insertSlot(SLOT_D_ID, "11:00", "AVAILABLE");
@@ -163,7 +165,6 @@ class AppointmentLifecycleIT {
     @Test
     void cancelsScheduledAndConfirmedAppointmentsAndIsIdempotent() {
         UUID scheduledId = insertAppointment(SLOT_A_ID, "SCHEDULED", null);
-        jdbcTemplate.update("update availability_slots set status = 'RESERVED' where id = ?", SLOT_B_ID);
         UUID confirmedId = insertAppointment(SLOT_B_ID, "CONFIRMED", null);
 
         appointmentService.cancelAppointment(scheduledId);
@@ -202,9 +203,7 @@ class AppointmentLifecycleIT {
     @Test
     void exposesLifecycleThroughHttpWithoutDuplicatingSideEffects() throws Exception {
         UUID confirmId = insertAppointment(SLOT_A_ID, "SCHEDULED", null);
-        jdbcTemplate.update("update availability_slots set status = 'RESERVED' where id = ?", SLOT_B_ID);
         UUID cancelId = insertAppointment(SLOT_B_ID, "SCHEDULED", null);
-        jdbcTemplate.update("update availability_slots set status = 'RESERVED' where id = ?", SLOT_C_ID);
         UUID rescheduleId = insertAppointment(SLOT_C_ID, "SCHEDULED", null);
 
         mockMvc.perform(post("/appointments/{id}/confirm", confirmId)
@@ -269,11 +268,10 @@ class AppointmentLifecycleIT {
     @Test
     void rollsBackWhenSuccessorCreationFails() {
         UUID appointmentId = insertAppointment(SLOT_A_ID, "SCHEDULED", null);
-        insertAppointment(SLOT_B_ID, "SCHEDULED", null);
-        jdbcTemplate.update("update availability_slots set status = 'AVAILABLE' where id = ?", SLOT_B_ID);
+        createRejectingAppointmentInsertTrigger(SLOT_B_ID);
 
         assertThatThrownBy(() -> appointmentService.rescheduleAppointment(appointmentId, SLOT_B_ID))
-                .isInstanceOf(SlotUnavailableException.class);
+                .isInstanceOf(DataAccessException.class);
 
         assertUnchangedReschedule(appointmentId, SLOT_B_ID);
         assertThat(appointmentCountForPredecessor(appointmentId)).isZero();
@@ -358,7 +356,6 @@ class AppointmentLifecycleIT {
     @Test
     void serializesConcurrentConfirmationAndCancellation() throws Exception {
         UUID confirmId = insertAppointment(SLOT_A_ID, "SCHEDULED", null);
-        jdbcTemplate.update("update availability_slots set status = 'RESERVED' where id = ?", SLOT_B_ID);
         UUID cancelId = insertAppointment(SLOT_B_ID, "SCHEDULED", null);
         createSlotReleaseObservationTrigger(SLOT_B_ID);
 
@@ -400,18 +397,17 @@ class AppointmentLifecycleIT {
 
         authenticate("PROFESSIONAL");
         appointmentService.startAppointmentAttention(appointmentId);
-        appointmentService.completeAppointment(appointmentId);
-        appointmentService.completeAppointment(appointmentId);
+        assertThatThrownBy(() -> appointmentService.completeAppointment(appointmentId))
+                .isInstanceOf(InvalidAppointmentTransitionException.class);
 
-        assertThat(appointmentStatus(appointmentId)).isEqualTo("COMPLETED");
-        assertThat(flowStage(appointmentId)).isEqualTo("FINISHED");
+        assertThat(appointmentStatus(appointmentId)).isEqualTo("CONFIRMED");
+        assertThat(flowStage(appointmentId)).isEqualTo("IN_ATTENTION");
         assertThat(slotStatus(SLOT_A_ID)).isEqualTo("RESERVED");
         assertThat(auditCount("APPOINTMENT_CHECKED_IN")).isEqualTo(1);
         assertThat(auditCount("APPOINTMENT_WAITING")).isEqualTo(1);
         assertThat(auditCount("APPOINTMENT_ATTENTION_STARTED")).isEqualTo(1);
-        assertThat(auditCount("APPOINTMENT_COMPLETED")).isEqualTo(1);
+        assertThat(auditCount("APPOINTMENT_COMPLETED")).isZero();
         assertThat(auditFlowStage("APPOINTMENT_CHECKED_IN", "old_values")).isNull();
-        assertThat(auditFlowStage("APPOINTMENT_COMPLETED", "new_values")).isEqualTo("FINISHED");
     }
 
     @Test
@@ -475,7 +471,6 @@ class AppointmentLifecycleIT {
         assertThat(flowStage(appointmentId)).isEqualTo("IN_ATTENTION");
 
         UUID deniedId = insertAppointment(SLOT_B_ID, "CONFIRMED", null);
-        jdbcTemplate.update("update availability_slots set status = 'RESERVED' where id = ?", SLOT_B_ID);
         jdbcTemplate.update("update appointments set flow_stage = 'WAITING' where id = ?", deniedId);
         jdbcTemplate.update("update professionals set user_id = null where id = ?", PROFESSIONAL_ID);
 
@@ -587,7 +582,6 @@ class AppointmentLifecycleIT {
                         where activity.datname = current_database()
                           and activity.pid <> pg_backend_pid()
                           and cardinality(pg_blocking_pids(activity.pid)) > 0
-                          and lower(activity.query) like '%appointment%'
                     )
                     """, Boolean.class);
             if (Boolean.TRUE.equals(blocked)) {
@@ -624,13 +618,16 @@ class AppointmentLifecycleIT {
     }
 
     private void insertSlot(UUID slotId, String startTime, String status) {
+        LocalDate nextMonday = LocalDate.now(ZoneId.of("America/Lima"))
+                .with(TemporalAdjusters.next(DayOfWeek.MONDAY));
         jdbcTemplate.update(
                 "insert into availability_slots "
                         + "(id, schedule_id, slot_date, start_time, end_time, status) "
-                        + "values (?, ?, date '2031-01-06', cast(? as time), "
+                        + "values (?, ?, ?, cast(? as time), "
                         + "cast(? as time) + interval '30 minutes', ?)",
                 slotId,
                 SCHEDULE_ID,
+                Date.valueOf(nextMonday),
                 startTime,
                 startTime,
                 status
@@ -639,17 +636,19 @@ class AppointmentLifecycleIT {
 
     private UUID insertAppointment(UUID slotId, String status, UUID predecessorId) {
         UUID appointmentId = UUID.randomUUID();
-        jdbcTemplate.update(
-                "insert into appointments "
-                        + "(id, patient_id, professional_id, slot_id, appointment_status, reason, "
-                        + "rescheduled_from_id) values (?, ?, ?, ?, ?, 'Lifecycle integration test', ?)",
-                appointmentId,
-                PATIENT_ID,
-                PROFESSIONAL_ID,
-                slotId,
-                status,
-                predecessorId
-        );
+        new TransactionTemplate(transactionManager).executeWithoutResult(ignored -> {
+            if (status.equals("SCHEDULED") || status.equals("CONFIRMED") || status.equals("COMPLETED")) {
+                jdbcTemplate.update("update availability_slots set status='RESERVED' where id=?", slotId);
+            }
+            jdbcTemplate.update(
+                    "insert into appointments "
+                            + "(id, patient_id, professional_id, slot_id, appointment_status, reason, "
+                            + "rescheduled_from_id) values (?, ?, ?, ?, ?, 'Lifecycle integration test', ?)",
+                    appointmentId, PATIENT_ID, PROFESSIONAL_ID, slotId, "SCHEDULED", predecessorId);
+            if (status.equals("CONFIRMED")) {
+                jdbcTemplate.update("update appointments set appointment_status='CONFIRMED' where id=?", appointmentId);
+            }
+        });
         return appointmentId;
     }
 
@@ -677,6 +676,25 @@ class AppointmentLifecycleIT {
                 create trigger reject_lifecycle_appointment_update_trigger
                 before update on appointments
                 for each row execute function reject_lifecycle_appointment_update()
+                """);
+    }
+
+    private void createRejectingAppointmentInsertTrigger(UUID slotId) {
+        jdbcTemplate.execute("""
+                create function reject_lifecycle_appointment_insert() returns trigger
+                language plpgsql as $$
+                begin
+                    if new.slot_id = '%s'::uuid then
+                        raise exception 'forced successor insert failure';
+                    end if;
+                    return new;
+                end;
+                $$
+                """.formatted(slotId));
+        jdbcTemplate.execute("""
+                create trigger reject_lifecycle_appointment_insert_trigger
+                before insert on appointments
+                for each row execute function reject_lifecycle_appointment_insert()
                 """);
     }
 
@@ -748,6 +766,8 @@ class AppointmentLifecycleIT {
     }
 
     private void dropFailureTriggers() {
+        jdbcTemplate.execute("drop trigger if exists reject_lifecycle_appointment_insert_trigger on appointments");
+        jdbcTemplate.execute("drop function if exists reject_lifecycle_appointment_insert()");
         jdbcTemplate.execute("drop trigger if exists reject_lifecycle_appointment_update_trigger on appointments");
         jdbcTemplate.execute("drop function if exists reject_lifecycle_appointment_update()");
         jdbcTemplate.execute("drop trigger if exists reject_lifecycle_audit_insert_trigger on audit_logs");

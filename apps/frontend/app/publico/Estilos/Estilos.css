@@ -1,0 +1,787 @@
+/* Reseteo básico y variables */
+:root {
+    --primary-blue: #2563eb;
+    --dark-blue: #1e3a8a;
+    --light-bg: #f8fafc;
+    --text-dark: #0f172a;
+    --text-gray: #475569;
+    --white: #ffffff;
+    --border-color: #e2e8f0;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 35vh; /* Centra el contenido en pantalla */
+}
+
+body {
+    background-color: var(--white);
+    color: var(--text-dark);
+}
+
+/* ================= NAV BAR ================= */
+.navbar, .navbar-new {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap; /* Allows wrapping on smaller screens */
+    padding: 1rem 4rem;
+    background-color: var(--white);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logo-circle {
+    width: 35px;
+    height: 35px;
+    background-color: var(--primary-blue);
+    border-radius: 50%;
+    border: 3px solid #bfdbfe;
+}
+
+.brand-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--primary-blue);
+}
+
+.nav-links {
+    display: flex;
+    gap: 2rem;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: var(--text-dark);
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.nav-links a span {
+    font-size: 0.8rem;
+    color: var(--text-gray);
+}
+
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.contact-info {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 600;
+}
+
+.login-icon {
+    text-decoration: none;
+    font-size: 1.2rem;
+    color: var(--text-dark);
+}
+
+.btn-primary {
+    background-color: var(--primary-blue);
+    color: var(--white);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 25px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.btn-primary:hover {
+    background-color: var(--dark-blue);
+}
+
+/* ================= HERO SECTION ================= */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.hero-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--light-bg);
+    border-radius: 20px;
+    padding: 3rem;
+    margin-top: 2rem;
+    margin-bottom: 3rem;
+}
+
+.hero-text {
+    flex: 1;
+    padding-right: 2rem;
+}
+
+.hero-text h1 {
+    font-size: 3.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    color: var(--text-dark);
+}
+
+.hero-text p {
+    font-size: 1.1rem;
+    color: var(--text-gray);
+    margin-bottom: 2rem;
+    line-height: 1.5;
+}
+
+.btn-secondary {
+    background-color: var(--primary-blue);
+    color: var(--white);
+    border: none;
+    padding: 0.8rem 2rem;
+    border-radius: 25px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.hero-image-container {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.placeholder-image {
+    width: 100%;
+    max-width: 450px;
+    height: 300px;
+    background-color: #cbd5e1;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-gray);
+}
+
+/* ================= ACTION CARDS ================= */
+.action-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 4rem;
+}
+
+.card {
+    background-color: var(--white);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+}
+
+.card-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--primary-blue);
+}
+
+.card h3 {
+    font-size: 1rem;
+    color: var(--text-dark);
+    font-weight: 600;
+}
+
+/* ================= UTILIDADES ================= */
+.placeholder-img {
+    background-color: #cbd5e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-gray);
+    font-size: 0.9rem;
+}
+
+.btn-outline {
+    display: inline-block;
+    padding: 0.5rem 1.2rem;
+    border: 1px solid var(--text-dark);
+    border-radius: 20px;
+    text-decoration: none;
+    color: var(--text-dark);
+    font-weight: 600;
+    margin-top: 1rem;
+    transition: all 0.3s ease;
+}
+
+.btn-outline:hover {
+    background-color: var(--text-dark);
+    color: var(--white);
+}
+
+/* ================= ESPECIALIDADES ================= */
+.specialties-section {
+    margin-bottom: 5rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+}
+
+.section-header h2 {
+    font-size: 2.2rem;
+    color: var(--text-dark);
+}
+
+.specialties-tabs {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.specialties-tabs .tab {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    color: var(--text-gray);
+    cursor: pointer;
+    font-weight: 500;
+    padding-bottom: 1rem;
+    margin-bottom: -1rem; /* Para alinear con el borde */
+}
+
+.specialties-tabs .tab.active {
+    color: var(--text-dark);
+    font-weight: 700;
+    border-bottom: 3px solid var(--text-dark);
+}
+
+.specialties-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.specialty-card {
+    border: 1px solid var(--border-color);
+    border-radius: 15px;
+    overflow: hidden;
+    background-color: var(--white);
+}
+
+.specialty-img {
+    height: 180px;
+    width: 100%;
+    object-fit: cover;
+}
+
+.specialty-content {
+    padding: 1.5rem;
+}
+
+.specialty-content h3 {
+    margin-bottom: 0.5rem;
+    font-size: 1.3rem;
+}
+
+.specialty-content p {
+    color: var(--text-gray);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    height: 65px; /* Altura fija para alinear botones */
+}
+
+/* ================= SEDES (UBICACIÓN) ================= */
+.location-section {
+    display: flex;
+    gap: 4rem;
+    margin-bottom: 5rem;
+    align-items: center;
+}
+
+.location-info {
+    flex: 1;
+}
+
+.location-info h2 {
+    font-size: 2.2rem;
+    margin-bottom: 2rem;
+    line-height: 1.2;
+}
+
+.location-details {
+    padding: 1.5rem 0;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.location-details h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.location-details p {
+    color: var(--text-gray);
+    margin-bottom: 0.3rem;
+}
+
+.location-image {
+    flex: 1.5;
+}
+
+.location-image .big-img {
+    height: 400px;
+    border-radius: 20px;
+    width: 100%;
+    object-fit: cover;
+}
+
+/* ================= APP BANNER ================= */
+.app-section {
+    margin-bottom: 5rem;
+}
+
+.app-banner {
+    background-color: #e0f2fe; /* Azul muy claro similar a la captura */
+    border-radius: 25px;
+    display: flex;
+    align-items: center;
+    padding: 3rem;
+    gap: 4rem;
+}
+
+.app-mockup {
+    width: 250px;
+    height: 450px;
+    border-radius: 30px;
+    background-color: #0284c7; /* Azul más oscuro para simular el cel */
+    color: white;
+}
+
+.app-text h2 {
+    font-size: 2.2rem;
+    margin-bottom: 1.5rem;
+}
+
+.app-features {
+    list-style: none;
+}
+
+.app-features li {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+/* ================= FOOTER ================= */
+.site-footer {
+    border-top: 1px solid var(--border-color);
+    padding: 4rem 4rem 1rem 4rem;
+    background-color: var(--white);
+}
+
+.footer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    margin-bottom: 3rem;
+}
+
+.footer-col h4 {
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+    color: var(--text-dark);
+}
+
+.footer-col ul {
+    list-style: none;
+}
+
+.footer-col ul li {
+    margin-bottom: 0.8rem;
+}
+
+.footer-col ul li a {
+    text-decoration: none;
+    color: var(--text-gray);
+    font-size: 0.95rem;
+    transition: color 0.3s;
+}
+
+.footer-col ul li a:hover {
+    color: var(--primary-blue);
+}
+
+.footer-bottom {
+    text-align: center;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-gray);
+    font-size: 0.9rem;
+}
+
+/* ================= NUEVA BARRA DE NAVEGACIÓN ================= */
+.navbar-new {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 3rem;
+    background-color: var(--white);
+    border-bottom: 1px solid var(--border-color);
+    font-family: Arial, sans-serif;
+}
+.nav-links-new a {
+    text-decoration: none;
+    color: #333;
+    margin: 0 1rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+.nav-actions-new {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+.login-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: #333;
+    font-weight: 600;
+}
+.btn-text {
+    text-decoration: none;
+    color: #333;
+    font-weight: 600;
+}
+
+/* ================= LOGIN ================= */
+.login-body {
+    background-color: #f0f4f8;
+    min-height: 100vh; /* Cambiado para evitar que se corte en pantallas pequeñas */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem; /* Espacio extra por si la caja crece mucho */
+}
+
+.login-container {
+    display: flex;
+    width: 900px;
+    min-height: 550px; /* Altura mínima para el Login */
+    height: auto;      /* Permite que la caja CREZCA con el Registro */
+    max-height: 90vh;  /* Evita que se salga de la pantalla del monitor */
+    background-color: var(--white);
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.login-image-side {
+    flex: 1;
+    background-color: var(--primary-blue);
+    background-image: url('../Imagenes/images_logeo.jpg'); 
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+.login-form-side {
+    flex: 1;
+    padding: 2.5rem 3rem; /* Reducimos ligeramente el padding superior/inferior */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow-y: auto; /* Si la pantalla es muy bajita, permite hacer scroll solo dentro del formulario */
+}
+
+.auth-form .form-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 1rem; /* Compactamos el margen inferior (antes era 1.2rem) */
+}
+
+.form-group-row {
+    display: flex;
+    gap: 10px;
+}
+
+.auth-form input, .auth-form select {
+    padding: 0.75rem; /* Ajuste en el tamaño del input para ahorrar espacio vertical */
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.95rem;
+}
+
+.btn-block {
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+.register-prompt {
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+}
+
+/* ================= DASHBOARD PERSONAL ================= */
+.dashboard-body {
+    background-color: var(--light-bg);
+}
+.user-profile-widget {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-left: 2rem;
+    border-left: 1px solid var(--border-color);
+}
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    background-color: #cbd5e1;
+    border-radius: 50%;
+}
+.user-info {
+    display: flex;
+    flex-direction: column;
+}
+.user-name { font-weight: 700; font-size: 0.9rem; color: var(--primary-blue);}
+.user-role { font-size: 0.8rem; color: var(--text-gray); }
+.user-email { font-size: 0.75rem; color: #94a3b8; }
+.logout-link {
+    font-size: 0.85rem;
+    color: #ef4444;
+    text-decoration: none;
+    margin-left: 1rem;
+}
+.dashboard-container {
+    max-width: 1000px;
+    margin: 3rem auto;
+}
+.dashboard-header { margin-bottom: 2rem; }
+.clean-action-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+}
+.clean-card {
+    background-color: var(--white);
+    padding: 2.5rem 2rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    text-decoration: none;
+    color: var(--text-dark);
+    transition: all 0.2s;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+}
+.clean-card:hover {
+    border-color: var(--primary-blue);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 15px rgba(37, 99, 235, 0.1);
+}
+.clean-card h3 {
+    margin-bottom: 0.5rem;
+    font-size: 1.2rem;
+}
+.clean-card p {
+    color: var(--text-gray);
+    font-size: 0.9rem;
+}
+
+/* ================= NUEVO WIDGET DE USUARIO (DERECHA) ================= */
+.user-profile-widget-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto; /* Empuja todo a la derecha */
+}
+.user-info-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+.user-info-right .user-name {
+    color: var(--primary-blue);
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+}
+.role-logout-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2px;
+}
+.role-logout-container .user-role {
+    color: var(--text-gray);
+    font-size: 0.85rem;
+}
+.role-logout-container .logout-link {
+    color: #ef4444; /* Rojo para cerrar sesión */
+    text-decoration: none;
+    font-size: 0.85rem;
+}
+
+/* ================= TABLA Y CALENDARIO ================= */
+.no-vertical-borders th, .no-vertical-borders td {
+    border-left: none;
+    border-right: none;
+}
+.calendario-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    font-size: 0.9rem;
+    margin-top: 10px;
+}
+
+/* ================= LOGO Y MARCA ================= */
+.logo-img {
+    height: 45px;
+    width: auto;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.brand-name {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--dark-blue);
+    margin-left: 10px;
+    letter-spacing: 0.5px;
+}
+
+/* ================= DISEÑO RESPONSIVO ================= */
+@media (max-width: 900px) {
+    /* Layouts a 1 columna para secciones grandes (Tablets) */
+    .login-container {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+    }
+    .login-image-side {
+        height: 250px;
+        flex: none;
+    }
+    .login-form-side {
+        padding: 3rem 2rem;
+    }
+    
+    .hero-section {
+        flex-direction: column;
+        text-align: center;
+        padding: 2rem;
+    }
+    .hero-text {
+        padding-right: 0;
+        margin-bottom: 2rem;
+    }
+    
+    .dashboard-container {
+        flex-direction: column !important; 
+        align-items: center !important;
+    }
+    .dashboard-container > div {
+        width: 100%;
+    }
+    .dashboard-container aside {
+        width: 100% !important;
+        max-width: 450px;
+        margin: 0 auto;
+    }
+
+    /* Ubicación y App */
+    .location-section {
+        flex-direction: column;
+        text-align: center;
+        gap: 2rem;
+    }
+    .app-banner {
+        flex-direction: column;
+        text-align: center;
+        gap: 2rem;
+        padding: 2rem;
+    }
+}
+
+@media (max-width: 650px) {
+    /* Encabezados y navegación (Solo Celulares) */
+    .navbar, .navbar-new {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+        padding: 1rem;
+    }
+    .logo-container {
+        justify-content: center;
+    }
+    .nav-links {
+        flex-direction: column;
+        width: 100%;
+        align-items: center;
+        gap: 15px;
+    }
+    .user-profile-widget-right {
+        justify-content: center;
+        width: 100%;
+        margin-left: 0;
+    }
+
+    /* Ajuste de tipografía */
+    .hero-text h1 {
+        font-size: 2.2rem;
+    }
+    
+    /* Formularios y cuadrículas */
+    .form-group-row {
+        flex-direction: column;
+        gap: 0;
+    }
+    .form-group-row .form-group {
+        width: 100% !important;
+    }
+    
+    .clean-action-cards {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Calendario responsive */
+    .calendario-grid {
+        font-size: 0.75rem;
+    }
+}

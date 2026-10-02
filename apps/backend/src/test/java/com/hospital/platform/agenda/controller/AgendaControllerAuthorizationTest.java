@@ -102,6 +102,25 @@ class AgendaControllerAuthorizationTest {
                 .isInstanceOf(AccessDeniedException.class);
     }
 
+    @Test
+    @WithMockUser(roles = "PATIENT")
+    void patientCanOnlyAccessAvailabilityList() {
+        when(agendaService.findAvailability(null, null, null, null)).thenReturn(List.of());
+        assertThatCode(() -> agendaController.findAvailability(null, null, null, null))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> agendaController.findAvailabilitySlotById(SLOT_ID))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> agendaController.findAgendas(null, null))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    @WithMockUser(roles = "RECEPTIONIST")
+    void receptionistCannotAccessAvailability() {
+        assertThatThrownBy(() -> agendaController.findAvailability(null, null, null, null))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
     private CreateAgendaRequestDTO createRequest() {
         return new CreateAgendaRequestDTO(
                 PROFESSIONAL_ID,

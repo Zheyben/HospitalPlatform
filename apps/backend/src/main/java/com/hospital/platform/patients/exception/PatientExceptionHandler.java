@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 @RestControllerAdvice(assignableTypes = PatientController.class)
 public class PatientExceptionHandler {
@@ -25,6 +26,11 @@ public class PatientExceptionHandler {
     @ExceptionHandler(DuplicateDocumentException.class)
     ResponseEntity<PatientErrorResponseDTO> handleDuplicateDocument(DuplicateDocumentException exception) {
         return error(HttpStatus.CONFLICT, "Patient document already exists", "DUPLICATE_DOCUMENT");
+    }
+
+    @ExceptionHandler({InvalidDocumentException.class, MethodArgumentNotValidException.class})
+    ResponseEntity<PatientErrorResponseDTO> handleInvalidDocument(Exception exception) {
+        return error(HttpStatus.BAD_REQUEST, "Document type or number is invalid", "VALIDATION_ERROR");
     }
 
     @ExceptionHandler(PatientAlreadyLinkedException.class)
