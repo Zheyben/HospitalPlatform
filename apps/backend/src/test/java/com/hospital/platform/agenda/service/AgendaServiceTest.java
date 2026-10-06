@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doAnswer;
 
 import com.hospital.platform.agenda.contract.CapacityGateway;
 import com.hospital.platform.agenda.dto.AgendaResponseDTO;
+import com.hospital.platform.agenda.dto.AgendaPublicationResponseDTO;
 import com.hospital.platform.agenda.dto.AvailabilitySlotResponseDTO;
 import com.hospital.platform.agenda.dto.CreateAgendaRequestDTO;
 import com.hospital.platform.agenda.dto.UpdateAgendaRequestDTO;
@@ -18,6 +19,7 @@ import com.hospital.platform.agenda.entity.Schedule;
 import com.hospital.platform.agenda.exception.AgendaNotFoundException;
 import com.hospital.platform.agenda.exception.AvailabilitySlotNotFoundException;
 import com.hospital.platform.agenda.exception.InvalidScheduleTimeException;
+import com.hospital.platform.agenda.exception.InactiveAgendaException;
 import com.hospital.platform.agenda.exception.ProfessionalNotAvailableException;
 import com.hospital.platform.agenda.repository.AvailabilitySlotRepository;
 import com.hospital.platform.agenda.repository.ScheduleRepository;
@@ -57,6 +59,9 @@ class AgendaServiceTest {
     @Mock
     private CapacityGateway capacityGateway;
 
+    @Mock
+    private SlotGenerationService slotGenerationService;
+
     private AgendaService agendaService;
 
     @BeforeEach
@@ -66,7 +71,8 @@ class AgendaServiceTest {
                 availabilitySlotRepository,
                 professionalLookupService,
                 Clock.systemUTC(),
-                capacityGateway
+                capacityGateway,
+                slotGenerationService
         );
     }
 
@@ -162,6 +168,29 @@ class AgendaServiceTest {
 
         assertThat(response.active()).isFalse();
         assertThat(schedule.isActive()).isFalse();
+    }
+
+    @Test
+    void publishesAvailabilityForActiveAgenda() {
+        when(scheduleRepository.findById(AGENDA_ID)).thenReturn(Optional.of(schedule()));
+        when(slotGenerationService.generate(AGENDA_ID)).thenReturn(12);
+
+        AgendaPublicationResponseDTO result = agendaService.publishAgenda(AGENDA_ID);
+
+        assertThat(result.scheduleId()).isEqualTo(AGENDA_ID);
+        assertThat(result.createdSlots()).isEqualTo(12);
+        assertThat(result.horizonDays()).isEqualTo(SlotGenerationService.HORIZON_DAYS);
+    }
+
+    @Test
+    void rejectsPublicationForInactiveAgenda() {
+        Schedule inactive = schedule();
+        inactive.changeStatus(false);
+        when(scheduleRepository.findById(AGENDA_ID)).thenReturn(Optional.of(inactive));
+
+        assertThatThrownBy(() -> agendaService.publishAgenda(AGENDA_ID))
+                .isInstanceOf(InactiveAgendaException.class);
+        org.mockito.Mockito.verifyNoInteractions(slotGenerationService);
     }
 
     @Test

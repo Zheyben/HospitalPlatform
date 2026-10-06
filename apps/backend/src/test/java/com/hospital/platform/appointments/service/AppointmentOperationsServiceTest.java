@@ -19,6 +19,10 @@ import com.hospital.platform.audit.contract.AuditLogService;
 import com.hospital.platform.patients.contract.PatientLookupService;
 import com.hospital.platform.professionals.contract.ProfessionalLookupService;
 import com.hospital.platform.users.service.CurrentUserService;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,7 +55,8 @@ class AppointmentOperationsServiceTest {
 
     @BeforeEach void setUp() {
         service = new AppointmentService(appointments, patients, professionals, audit, currentUser,
-                new AppointmentMapper(), capacity);
+                new AppointmentMapper(), capacity,
+                Clock.fixed(Instant.parse("2026-10-06T04:59:59Z"), ZoneOffset.UTC));
     }
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
@@ -59,12 +64,56 @@ class AppointmentOperationsServiceTest {
         Appointment appointment = appointment();
         auth("RECEPTIONIST");
         when(appointments.findById(ID)).thenReturn(Optional.of(appointment));
+        when(appointments.findSlotDateByAppointmentId(ID)).thenReturn(LocalDate.of(2026, 10, 5));
         doAnswer(call -> { appointment.checkIn(); return null; }).when(capacity).stage(ID, "CHECK_IN");
         assertThat(service.checkInAppointment(ID).flowStage()).isEqualTo(FlowStage.CHECK_IN);
         verify(capacity).stage(ID, "CHECK_IN");
         verify(audit).record(org.mockito.ArgumentMatchers.eq(AuditEventType.APPOINTMENT_CHECKED_IN),
                 org.mockito.ArgumentMatchers.eq("Appointment"), org.mockito.ArgumentMatchers.eq(ID),
                 org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test void rejectsEarlyAndLateCheckInWithoutChangingStageOrAudit() {
+        Appointment appointment = appointment();
+        auth("RECEPTIONIST");
+        when(appointments.findById(ID)).thenReturn(Optional.of(appointment));
+        when(appointments.findSlotDateByAppointmentId(ID))
+                .thenReturn(LocalDate.of(2026, 10, 4), LocalDate.of(2026, 10, 6));
+
+        assertThatThrownBy(() -> service.checkInAppointment(ID))
+                .isInstanceOf(InvalidAppointmentTransitionException.class);
+        assertThatThrownBy(() -> service.checkInAppointment(ID))
+                .isInstanceOf(InvalidAppointmentTransitionException.class);
+        assertThat(appointment.getFlowStage()).isNull();
+        verify(capacity, org.mockito.Mockito.times(2)).lockAppointment(ID);
+        verifyNoMoreInteractions(capacity);
+        org.mockito.Mockito.verifyNoInteractions(audit);
+    }
+
+    @Test void limaMidnightRejectsPreviousDateEvenWhenUtcDateHasNotChanged() {
+        auth("RECEPTIONIST");
+        when(appointments.findById(ID)).thenReturn(Optional.of(appointment()));
+        when(appointments.findSlotDateByAppointmentId(ID)).thenReturn(LocalDate.of(2026, 10, 5));
+        service = new AppointmentService(appointments, patients, professionals, audit, currentUser,
+                new AppointmentMapper(), capacity,
+                Clock.fixed(Instant.parse("2026-10-06T05:00:00Z"), ZoneOffset.UTC));
+
+        assertThatThrownBy(() -> service.checkInAppointment(ID))
+                .isInstanceOf(InvalidAppointmentTransitionException.class);
+        verify(capacity).lockAppointment(ID);
+        verifyNoMoreInteractions(capacity);
+    }
+
+    @Test void repeatedCheckInKeepsItsOriginalResultWithoutNewAudit() {
+        Appointment appointment = appointment();
+        appointment.checkIn();
+        auth("RECEPTIONIST");
+        when(appointments.findById(ID)).thenReturn(Optional.of(appointment));
+
+        assertThat(service.checkInAppointment(ID).flowStage()).isEqualTo(FlowStage.CHECK_IN);
+        verify(capacity).lockAppointment(ID);
+        verifyNoMoreInteractions(capacity);
+        org.mockito.Mockito.verifyNoInteractions(audit);
     }
 
     @Test void waitingRequiresCheckIn() {
@@ -111,7 +160,7 @@ class AppointmentOperationsServiceTest {
         verifyNoMoreInteractions(capacity);
     }
 
-    @Test void professionalCompletesWithoutReleasingSlot() {
+    @Test void onlyMedicalFinalizationCompletesWithoutReleasingSlot() {
         Appointment appointment = appointment();
         appointment.checkIn();
         appointment.moveToWaiting();
@@ -121,7 +170,9 @@ class AppointmentOperationsServiceTest {
         when(currentUser.currentUserId()).thenReturn(USER);
         when(professionals.isActiveProfessionalLinkedToUser(PROFESSIONAL, USER)).thenReturn(true);
         doAnswer(call -> { appointment.complete(); return null; }).when(capacity).complete(ID);
-        var result = service.completeAppointment(ID);
+        assertThatThrownBy(() -> service.completeAppointment(ID))
+                .isInstanceOf(InvalidAppointmentTransitionException.class);
+        var result = service.completeMedicalAppointment(ID);
         assertThat(result.appointmentStatus()).isEqualTo(AppointmentStatus.COMPLETED);
         assertThat(result.flowStage()).isEqualTo(FlowStage.FINISHED);
         verify(capacity).complete(ID);

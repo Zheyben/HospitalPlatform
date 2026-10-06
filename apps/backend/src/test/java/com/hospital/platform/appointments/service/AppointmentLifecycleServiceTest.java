@@ -21,6 +21,7 @@ import com.hospital.platform.patients.contract.PatientLookupService;
 import com.hospital.platform.patients.contract.PatientReference;
 import com.hospital.platform.professionals.contract.ProfessionalLookupService;
 import com.hospital.platform.users.service.CurrentUserService;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -57,7 +58,7 @@ class AppointmentLifecycleServiceTest {
 
     @BeforeEach void setUp() {
         service = new AppointmentService(appointments, patients, professionals, audit, currentUser,
-                new AppointmentMapper(), capacity);
+                new AppointmentMapper(), capacity, Clock.systemUTC());
     }
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 

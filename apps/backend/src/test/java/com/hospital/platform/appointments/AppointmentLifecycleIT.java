@@ -11,9 +11,15 @@ import com.hospital.platform.appointments.exception.AppointmentSuccessorExistsEx
 import com.hospital.platform.appointments.exception.InvalidAppointmentTransitionException;
 import com.hospital.platform.appointments.exception.SlotUnavailableException;
 import com.hospital.platform.appointments.service.AppointmentService;
+import com.hospital.platform.medical.dto.MedicalHistoryDraftDTO;
+import com.hospital.platform.medical.dto.MedicalHistoryDraftUpdateDTO;
+import com.hospital.platform.medical.service.MedicalDraftVersionConflictException;
+import com.hospital.platform.medical.service.MedicalEncounterService;
+import com.hospital.platform.medical.service.MedicalHistoryDraftService;
 import com.hospital.platform.users.service.AuthenticatedUser;
 import java.net.URI;
 import java.sql.Date;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -31,9 +37,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.security.access.AccessDeniedException;
@@ -55,6 +64,19 @@ import org.testcontainers.utility.DockerImageName;
 @Testcontainers
 @AutoConfigureMockMvc
 class AppointmentLifecycleIT {
+
+    private static final ZoneId LIMA = ZoneId.of("America/Lima");
+    private static final LocalDate APPOINTMENT_DATE = LocalDate.now(LIMA)
+            .with(TemporalAdjusters.next(DayOfWeek.MONDAY));
+
+    @TestConfiguration
+    static class CheckInClockConfiguration {
+        @Bean
+        @Primary
+        Clock checkInTestClock() {
+            return Clock.fixed(APPOINTMENT_DATE.atStartOfDay(LIMA).toInstant(), LIMA);
+        }
+    }
 
     private static final UUID USER_ID = UUID.fromString("55555555-5555-5555-5555-555555555591");
     private static final UUID PATIENT_ID = UUID.fromString("66666666-6666-6666-6666-666666666691");
@@ -84,6 +106,12 @@ class AppointmentLifecycleIT {
 
     @Autowired
     private AppointmentService appointmentService;
+
+    @Autowired
+    private MedicalEncounterService medicalEncounterService;
+
+    @Autowired
+    private MedicalHistoryDraftService medicalHistoryDraftService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -411,6 +439,49 @@ class AppointmentLifecycleIT {
     }
 
     @Test
+    void rejectsCheckInOnAnotherLimaDateWithoutChangingStateOrAudit() {
+        UUID laterSlotId = UUID.randomUUID();
+        insertSlot(laterSlotId, "08:00", "AVAILABLE", APPOINTMENT_DATE.plusWeeks(1));
+        UUID appointmentId = insertAppointment(laterSlotId, "CONFIRMED", null);
+        authenticate("RECEPTIONIST");
+
+        assertThatThrownBy(() -> appointmentService.checkInAppointment(appointmentId))
+                .isInstanceOf(InvalidAppointmentTransitionException.class);
+        assertThat(appointmentStatus(appointmentId)).isEqualTo("CONFIRMED");
+        assertThat(flowStage(appointmentId)).isNull();
+        assertThat(slotStatus(laterSlotId)).isEqualTo("RESERVED");
+        assertThat(auditCount("APPOINTMENT_CHECKED_IN")).isZero();
+    }
+
+    @Test
+    void waitingRoomContainsOnlyTodaysActiveReceptionStagesInSlotOrder() {
+        UUID checkedInId = insertAppointment(SLOT_A_ID, "CONFIRMED", null);
+        UUID waitingId = insertAppointment(SLOT_B_ID, "CONFIRMED", null);
+        insertAppointment(SLOT_C_ID, "CONFIRMED", null);
+        insertAppointment(SLOT_D_ID, "SCHEDULED", null);
+        UUID laterSlotId = UUID.randomUUID();
+        insertSlot(laterSlotId, "08:00", "AVAILABLE", APPOINTMENT_DATE.plusWeeks(1));
+        UUID laterAppointmentId = insertAppointment(laterSlotId, "CONFIRMED", null);
+        jdbcTemplate.update("update appointments set flow_stage='CHECK_IN' where id=?", laterAppointmentId);
+        authenticate("RECEPTIONIST");
+        appointmentService.checkInAppointment(checkedInId);
+        appointmentService.checkInAppointment(waitingId);
+        appointmentService.moveAppointmentToWaiting(waitingId);
+
+        var entries = appointmentService.findReceptionWaitingRoom(50, 0);
+
+        assertThat(entries).hasSize(2);
+        assertThat(entries).extracting(entry -> entry.appointmentId())
+                .containsExactly(checkedInId, waitingId);
+        assertThat(entries).extracting(entry -> entry.flowStage().name())
+                .containsExactly("CHECK_IN", "WAITING");
+        assertThat(entries.getFirst().patientDisplay()).isEqualTo("DNI 93000001");
+        assertThat(entries.getFirst().professionalName()).isEqualTo("910003");
+        assertThat(appointmentService.findReceptionWaitingRoom(1, 1))
+                .extracting(entry -> entry.appointmentId()).containsExactly(waitingId);
+    }
+
+    @Test
     void repeatsWaitingThroughHttpWithoutChangingStateOrDuplicatingAudit() throws Exception {
         UUID appointmentId = insertAppointment(SLOT_A_ID, "CONFIRMED", null);
         authenticate("RECEPTIONIST");
@@ -444,6 +515,101 @@ class AppointmentLifecycleIT {
 
         assertThat(flowStage(appointmentId)).isEqualTo("IN_ATTENTION");
         assertThat(auditCount("APPOINTMENT_ATTENTION_STARTED")).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from clinical_encounters where appointment_id = ?",
+                Integer.class, appointmentId)).isEqualTo(1);
+        assertThat(auditCount("CLINICAL_ENCOUNTER_STARTED")).isEqualTo(1);
+    }
+
+    @Test
+    void startsOneClinicalEncounterAcrossNewAndLegacyRoutes() throws Exception {
+        UUID appointmentId = insertAppointment(SLOT_A_ID, "CONFIRMED", null);
+        authenticate("RECEPTIONIST");
+        appointmentService.checkInAppointment(appointmentId);
+        appointmentService.moveAppointmentToWaiting(appointmentId);
+        mockMvc.perform(post("/medical/appointments/{id}/start", appointmentId)
+                        .with(authentication(roleAuthentication("RECEPTIONIST"))))
+                .andExpect(status().isForbidden());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from clinical_encounters where appointment_id = ?",
+                Integer.class, appointmentId)).isZero();
+        authenticate("PROFESSIONAL");
+
+        mockMvc.perform(post("/medical/appointments/{id}/start", appointmentId)
+                        .with(authentication(roleAuthentication("PROFESSIONAL"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appointmentId").value(appointmentId.toString()))
+                .andExpect(jsonPath("$.status").value("OPEN"))
+                .andExpect(jsonPath("$.legacyStart").value(false));
+        UUID encounterId = jdbcTemplate.queryForObject(
+                "select id from clinical_encounters where appointment_id = ?", UUID.class, appointmentId);
+        mockMvc.perform(post("/medical/appointments/{id}/start", appointmentId)
+                        .with(authentication(roleAuthentication("PROFESSIONAL"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.encounterId").value(encounterId.toString()));
+        mockMvc.perform(post("/appointments/{id}/start-attention", appointmentId)
+                        .with(authentication(roleAuthentication("PROFESSIONAL"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.flowStage").value("IN_ATTENTION"));
+
+        assertThat(jdbcTemplate.queryForObject("select count(*) from clinical_encounters where appointment_id = ?",
+                Integer.class, appointmentId)).isEqualTo(1);
+        assertThat(auditCount("APPOINTMENT_ATTENTION_STARTED")).isEqualTo(1);
+        assertThat(auditCount("CLINICAL_ENCOUNTER_STARTED")).isEqualTo(1);
+    }
+
+    @Test
+    void serializesConcurrentMedicalStartWithoutDuplicatingEncounterOrAudit() throws Exception {
+        UUID appointmentId = insertAppointment(SLOT_A_ID, "CONFIRMED", null);
+        authenticate("RECEPTIONIST");
+        appointmentService.checkInAppointment(appointmentId);
+        appointmentService.moveAppointmentToWaiting(appointmentId);
+
+        assertThat(runWithDeterministicContention(
+                () -> medicalEncounterService.start(appointmentId), "PROFESSIONAL"))
+                .containsExactly("SUCCESS", "SUCCESS");
+
+        assertThat(flowStage(appointmentId)).isEqualTo("IN_ATTENTION");
+        assertThat(jdbcTemplate.queryForObject("select count(*) from clinical_encounters where appointment_id = ?",
+                Integer.class, appointmentId)).isEqualTo(1);
+        assertThat(auditCount("APPOINTMENT_ATTENTION_STARTED")).isEqualTo(1);
+        assertThat(auditCount("CLINICAL_ENCOUNTER_STARTED")).isEqualTo(1);
+    }
+
+    @Test
+    void serializesConcurrentHistoryDraftSavesWithOptimisticVersion() throws Exception {
+        UUID appointmentId = insertAppointment(SLOT_A_ID, "CONFIRMED", null);
+        authenticate("RECEPTIONIST");
+        appointmentService.checkInAppointment(appointmentId);
+        appointmentService.moveAppointmentToWaiting(appointmentId);
+        authenticate("PROFESSIONAL");
+        UUID encounterId = medicalEncounterService.start(appointmentId).encounter().encounterId();
+        MedicalHistoryDraftUpdateDTO update = new MedicalHistoryDraftUpdateDTO(
+                0, new MedicalHistoryDraftDTO(null, null, null, "Synthetic alert"));
+
+        assertThat(runWithDeterministicContention(
+                () -> medicalHistoryDraftService.save(encounterId, update), "PROFESSIONAL"))
+                .containsExactly("SUCCESS", "REJECTED");
+
+        assertThat(jdbcTemplate.queryForObject("select version from encounter_drafts where encounter_id = ?",
+                Integer.class, encounterId)).isEqualTo(1);
+        assertThat(auditCount("CLINICAL_DRAFT_SAVED")).isEqualTo(1);
+        assertThat(flowStage(appointmentId)).isEqualTo("IN_ATTENTION");
+    }
+
+    @Test
+    void refusesMedicalStartOutsideAppointmentDateAndRollsBackStage() throws Exception {
+        UUID laterSlotId = UUID.randomUUID();
+        insertSlot(laterSlotId, "08:00", "AVAILABLE", APPOINTMENT_DATE.plusWeeks(1));
+        UUID appointmentId = insertAppointment(laterSlotId, "CONFIRMED", null);
+        jdbcTemplate.update("update appointments set flow_stage = 'WAITING' where id = ?", appointmentId);
+        authenticate("PROFESSIONAL");
+
+        mockMvc.perform(post("/medical/appointments/{id}/start", appointmentId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_APPOINTMENT_TRANSITION"));
+        assertThat(flowStage(appointmentId)).isEqualTo("WAITING");
+        assertThat(jdbcTemplate.queryForObject("select count(*) from clinical_encounters where appointment_id = ?",
+                Integer.class, appointmentId)).isZero();
+        assertThat(auditCount("APPOINTMENT_ATTENTION_STARTED")).isZero();
     }
 
     @Test
@@ -565,7 +731,8 @@ class AppointmentLifecycleIT {
         try {
             operation.run();
             return "SUCCESS";
-        } catch (InvalidAppointmentTransitionException | AppointmentSuccessorExistsException exception) {
+        } catch (InvalidAppointmentTransitionException | AppointmentSuccessorExistsException
+                 | MedicalDraftVersionConflictException exception) {
             return "REJECTED";
         } finally {
             SecurityContextHolder.clearContext();
@@ -618,8 +785,10 @@ class AppointmentLifecycleIT {
     }
 
     private void insertSlot(UUID slotId, String startTime, String status) {
-        LocalDate nextMonday = LocalDate.now(ZoneId.of("America/Lima"))
-                .with(TemporalAdjusters.next(DayOfWeek.MONDAY));
+        insertSlot(slotId, startTime, status, APPOINTMENT_DATE);
+    }
+
+    private void insertSlot(UUID slotId, String startTime, String status, LocalDate date) {
         jdbcTemplate.update(
                 "insert into availability_slots "
                         + "(id, schedule_id, slot_date, start_time, end_time, status) "
@@ -627,7 +796,7 @@ class AppointmentLifecycleIT {
                         + "cast(? as time) + interval '30 minutes', ?)",
                 slotId,
                 SCHEDULE_ID,
-                Date.valueOf(nextMonday),
+                Date.valueOf(date),
                 startTime,
                 startTime,
                 status

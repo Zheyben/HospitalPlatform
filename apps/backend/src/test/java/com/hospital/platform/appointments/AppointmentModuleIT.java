@@ -141,7 +141,7 @@ class AppointmentModuleIT {
 
         assertThat(appointmentCount(CREATE_SLOT_ID)).isEqualTo(1);
         assertThat(slotStatus(CREATE_SLOT_ID)).isEqualTo("RESERVED");
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("5");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("18");
     }
 
     @Test

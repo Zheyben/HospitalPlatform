@@ -109,6 +109,9 @@ public class PostgresCapacityGateway implements CapacityGateway {
     @Override public void deactivateProfessional(UUID professionalId) {
         call("select capacity_professional_deactivate(?)", professionalId);
     }
+    @Override public void reactivateProfessional(UUID professionalId) {
+        call("select capacity_professional_reactivate(?)", professionalId);
+    }
     @Override public void disableUser(UUID userId) {
         call("select capacity_user_disable(?)", userId);
     }

@@ -9,7 +9,7 @@ Requisitos: Docker Desktop, Node.js/npm, Chrome y PowerShell. Desde la raíz del
 En la primera terminal:
 
 ```powershell
-cd "G:\NEGOCIO PROGRAMACION\VERSION 1\hospital-platform"
+# Ejecutar desde la raíz de este repositorio.
 docker compose -p hospital-platform up -d postgres
 docker compose -p hospital-platform ps postgres
 ```
@@ -49,7 +49,7 @@ La salida debe incluir `Started HospitalPlatformApplication` y `Tomcat started o
 En una tercera terminal:
 
 ```powershell
-cd "G:\NEGOCIO PROGRAMACION\VERSION 1\hospital-platform\apps\frontend"
+Set-Location .\apps\frontend
 npm ci
 Copy-Item .env.example .env.local -Force
 npm run build
@@ -62,9 +62,9 @@ El valor de `BACKEND_URL` en `.env.local` debe ser `http://127.0.0.1:18080/api/v
 
 1. Abrir `/register` a 1440 px. Crear un correo y DNI de 8 dígitos nuevos. Completar contraseña, nombres, apellidos, fecha de nacimiento pasada, teléfono y aseguradora. Mostrar el mensaje de cuenta creada. El registro no inicia sesión.
 2. Abrir `/login` e ingresar con ese correo y contraseña. La redirección lleva a `/patient/availability`.
-3. Mostrar especialidad, profesional, fecha y tramo horario de un slot real `AVAILABLE`. Elegir `Seleccionar`; en el resumen se muestran esos mismos datos recibidos de la API. Escribir un motivo breve.
+3. Seleccionar especialidad, profesional y fecha; elegir una hora disponible real. Elegir `Seleccionar`; en el resumen se muestran esos mismos datos recibidos de la API. Escribir un motivo breve.
 4. Seleccionar `Confirmar reserva`. Mostrar “Cita registrada correctamente” y el estado **`SCHEDULED`**. Conservar la referencia de cita visible.
-5. Abrir `Ver mis citas`. Mostrar la misma referencia, el motivo y `SCHEDULED`. “Registro” es la hora en que se creó la cita, no la hora del turno.
+5. Abrir `Ver mis citas`. Mostrar la misma referencia, el motivo, la fecha y hora del turno, el profesional, la especialidad y la etapa legible obtenidos de `GET /appointments/me/summary`.
 6. En pgAdmin, ejecutar las consultas de la sección siguiente para mostrar la relación `users → patients → appointments → availability_slots`, el horario real y el estado `RESERVED` del slot.
 
 Para repetir la demo, registrar otro correo y documento nuevos y elegir otro slot disponible. El E2E también crea pacientes y reservas reales en esta base local.
@@ -113,6 +113,6 @@ npm run test:e2e
 
 Playwright usa Chrome instalado en la ruta habitual de Windows o `PLAYWRIGHT_CHROME_PATH`. El flujo principal del E2E usa backend y PostgreSQL reales. Solo los estados vacíos y de error de red se simulan dentro de la prueba para comprobar su presentación.
 
-## Límite actual de “Mis citas”
+## Alcance de esta guía
 
-`GET /api/v1/appointments` no entrega la fecha/hora del slot ni los nombres de profesional y especialidad. Por eso esta pantalla muestra estado, motivo, registro e identificadores reales, sin completar esos datos con supuestos. La consulta de pgAdmin anterior permite enseñar el horario persistido durante la presentación.
+Esta guía D2 cubre el recorrido del paciente. Los portales de Administración, Recepción y Médico requieren cuentas sintéticas de esos roles; la demostración clínica final requiere además catálogos clínicos aprobados y cargados. Todavía no existe una guía de arranque en frío verificada para el recorrido integral.

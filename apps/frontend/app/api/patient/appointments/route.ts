@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorizedRequest, sameOrigin } from "@/lib/backend";
 
 export async function GET(request: NextRequest) {
-  return authorizedRequest(request, "/appointments");
+  return authorizedRequest(request, "/appointments/me/summary");
 }
 
 export async function POST(request: NextRequest) {

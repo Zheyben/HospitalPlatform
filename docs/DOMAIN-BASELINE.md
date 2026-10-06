@@ -166,8 +166,8 @@ Current values: `SCHEDULED`, `CONFIRMED`, `CANCELLED`, `RESCHEDULED`, `COMPLETED
 |---|---|---|---|---|
 | creation | create | `SCHEDULED` | PATIENT own; ADMIN/RECEPTIONIST for active patient | Not idempotent; slot uniqueness prevents duplicate active allocation. |
 | `SCHEDULED` | confirm | `CONFIRMED` | PATIENT own; ADMIN/RECEPTIONIST | Repeating in `CONFIRMED` returns success without duplicate audit. |
-| `SCHEDULED` or `CONFIRMED` | cancel | `CANCELLED` | PATIENT own; ADMIN/RECEPTIONIST | Repeating in `CANCELLED` preserves cancellation data and side effects. |
-| `SCHEDULED` or `CONFIRMED` | reschedule | original `RESCHEDULED`; successor `SCHEDULED` | PATIENT own; ADMIN/RECEPTIONIST | Not repeatable on the original; one direct successor is enforced. |
+| `SCHEDULED` or `CONFIRMED` | cancel | `CANCELLED` | PATIENT own; ADMIN | Repeating in `CANCELLED` preserves cancellation data and side effects. RECEPTIONIST receives 403. |
+| `SCHEDULED` or `CONFIRMED` | reschedule | original `RESCHEDULED`; successor `SCHEDULED` | PATIENT own; ADMIN | Not repeatable on the original; one direct successor is enforced. RECEPTIONIST receives 403. |
 | `CONFIRMED` + `IN_ATTENTION` | complete | `COMPLETED` | assigned PROFESSIONAL | Repeating `COMPLETED` + `FINISHED` returns success without duplicate audit. |
 
 All other transitions are invalid. `NO_SHOW` is not a current state.
@@ -518,8 +518,8 @@ All paths include the configured `/api/v1` context path.
 | POST/GET `/appointments` | PATIENT/ADMIN/RECEPTIONIST | Create DTO -> 201; role-filtered list | 400, 401, 403, 404, 409 |
 | GET `/appointments/{id}` | PATIENT own/ADMIN/RECEPTIONIST | Appointment DTO | 400, 401, 403, 404 |
 | POST `/appointments/{id}/confirm` | PATIENT own/ADMIN/RECEPTIONIST | No body -> Appointment DTO | 400, 401, 403, 404, 409 |
-| POST `/appointments/{id}/cancel` | PATIENT own/ADMIN/RECEPTIONIST | No body -> Appointment DTO | 400, 401, 403, 404, 409 |
-| POST `/appointments/{id}/reschedule` | PATIENT own/ADMIN/RECEPTIONIST | Slot DTO -> 201 successor | 400, 401, 403, 404, 409 |
+| POST `/appointments/{id}/cancel` | PATIENT own/ADMIN | No body -> Appointment DTO | 400, 401, 403, 404, 409 |
+| POST `/appointments/{id}/reschedule` | PATIENT own/ADMIN | Slot DTO -> 201 successor | 400, 401, 403, 404, 409 |
 | POST `/appointments/{id}/check-in` | RECEPTIONIST | No body -> Appointment DTO | 400, 401, 403, 404, 409 |
 | POST `/appointments/{id}/waiting` | RECEPTIONIST | No body -> Appointment DTO | 400, 401, 403, 404, 409 |
 | POST `/appointments/{id}/start-attention` | Assigned PROFESSIONAL | No body -> Appointment DTO | 400, 401, 403, 404, 409 |

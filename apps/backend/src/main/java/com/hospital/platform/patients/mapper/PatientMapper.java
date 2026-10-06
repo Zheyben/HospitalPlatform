@@ -2,6 +2,7 @@ package com.hospital.platform.patients.mapper;
 
 import com.hospital.platform.patients.dto.PatientResponseDTO;
 import com.hospital.platform.patients.entity.Patient;
+import com.hospital.platform.patients.domain.PatientDemographics;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Component;
 public class PatientMapper {
 
     public PatientResponseDTO toResponse(Patient patient) {
+        PatientDemographics demographics = patient.getDemographics();
         return new PatientResponseDTO(
                 patient.getId(),
                 patient.getUserId(),
@@ -17,8 +19,14 @@ public class PatientMapper {
                 patient.getBirthDate(),
                 patient.getPhone(),
                 patient.getInsurance(),
+                patient.getInsuranceId(),
                 patient.getAddress(),
-                patient.isActive()
+                patient.getSex(),
+                patient.isActive(),
+                demographics.maritalStatus(), demographics.occupation(), demographics.district(),
+                demographics.educationLevel(), demographics.affiliationNumber(),
+                demographics.emergencyContactName(), demographics.emergencyContactRelationship(),
+                demographics.emergencyContactPhone()
         );
     }
 

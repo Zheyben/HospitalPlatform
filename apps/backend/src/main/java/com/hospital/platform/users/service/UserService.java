@@ -77,6 +77,17 @@ public class UserService {
         return userRepository.saveAndFlush(user);
     }
 
+    @Transactional
+    public User registerProfessionalUser(String email, String password, String firstName, String lastName) {
+        String normalizedEmail = normalizeEmail(email);
+        assertEmailAvailable(normalizedEmail);
+        User user = newUser(
+                "professional-" + UUID.randomUUID(), normalizedEmail, password, Set.of(RoleName.PROFESSIONAL)
+        );
+        user.setNames(firstName.trim(), lastName.trim());
+        return userRepository.saveAndFlush(user);
+    }
+
     private User newUser(String username, String email, String password, Set<RoleName> roleNames) {
         User user = new User(null, username, email, passwordEncoder.encode(password), true);
         user.replaceRoles(resolveRoles(roleNames));

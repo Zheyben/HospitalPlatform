@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.when;
 
 import com.hospital.platform.agenda.dto.AgendaResponseDTO;
+import com.hospital.platform.agenda.dto.AgendaPublicationResponseDTO;
 import com.hospital.platform.agenda.dto.AvailabilitySlotResponseDTO;
 import com.hospital.platform.agenda.dto.CreateAgendaRequestDTO;
 import com.hospital.platform.agenda.dto.UpdateAgendaRequestDTO;
@@ -65,6 +66,8 @@ class AgendaControllerAuthorizationTest {
         when(agendaService.findAgendaById(AGENDA_ID)).thenReturn(agendaResponse());
         when(agendaService.updateAgenda(any(), any())).thenReturn(agendaResponse());
         when(agendaService.changeAgendaStatus(any(), anyBoolean())).thenReturn(agendaResponse());
+        when(agendaService.publishAgenda(AGENDA_ID))
+                .thenReturn(new AgendaPublicationResponseDTO(AGENDA_ID, 1, 14));
         when(agendaService.findAvailability(null, null, null, null)).thenReturn(List.of());
         when(agendaService.findAvailabilitySlotById(SLOT_ID)).thenReturn(slotResponse());
 
@@ -76,6 +79,7 @@ class AgendaControllerAuthorizationTest {
                 AGENDA_ID,
                 new UpdateAgendaStatusRequestDTO(false)
         )).doesNotThrowAnyException();
+        assertThatCode(() -> agendaController.publishAgenda(AGENDA_ID)).doesNotThrowAnyException();
         assertThatCode(() -> agendaController.findAvailability(null, null, null, null))
                 .doesNotThrowAnyException();
         assertThatCode(() -> agendaController.findAvailabilitySlotById(SLOT_ID)).doesNotThrowAnyException();
@@ -96,6 +100,8 @@ class AgendaControllerAuthorizationTest {
                 AGENDA_ID,
                 new UpdateAgendaStatusRequestDTO(false)
         )).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> agendaController.publishAgenda(AGENDA_ID))
+                .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> agendaController.findAvailability(null, null, null, null))
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> agendaController.findAvailabilitySlotById(SLOT_ID))
@@ -108,6 +114,8 @@ class AgendaControllerAuthorizationTest {
         when(agendaService.findAvailability(null, null, null, null)).thenReturn(List.of());
         assertThatCode(() -> agendaController.findAvailability(null, null, null, null))
                 .doesNotThrowAnyException();
+        assertThatThrownBy(() -> agendaController.publishAgenda(AGENDA_ID))
+                .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> agendaController.findAvailabilitySlotById(SLOT_ID))
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> agendaController.findAgendas(null, null))

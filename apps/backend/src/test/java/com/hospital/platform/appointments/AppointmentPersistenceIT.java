@@ -121,7 +121,7 @@ class AppointmentPersistenceIT {
 
     @Test
     void appliesFlywayV5AndExposesTheExpectedSchema() {
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("5");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("18");
         assertThat(columnExists("appointments", "rescheduled_from_id")).isTrue();
         assertThat(constraintExists("appointments_slot_id_key")).isFalse();
         assertThat(constraintExists("fk_appointments_rescheduled_from")).isTrue();
@@ -277,7 +277,7 @@ class AppointmentPersistenceIT {
                     .load();
             latestFlyway.migrate();
 
-            assertThat(latestFlyway.info().current().getVersion().toString()).isEqualTo("5");
+            assertThat(latestFlyway.info().current().getVersion().toString()).isEqualTo("18");
             assertThat(migrationJdbc.queryForObject(
                     "select count(*) from " + schema + ".appointments where id = ?",
                     Integer.class,
@@ -353,7 +353,7 @@ class AppointmentPersistenceIT {
             Flyway latest = Flyway.configure().dataSource(isolated)
                     .locations("classpath:db/migration").load();
             latest.migrate();
-            assertThat(latest.info().current().getVersion().toString()).isEqualTo("5");
+            assertThat(latest.info().current().getVersion().toString()).isEqualTo("18");
             assertThat(fixtureJdbc.queryForObject("select count(*) from patients", Integer.class)).isEqualTo(14);
             assertThat(fixtureJdbc.queryForObject("select document_number from patients where id=?",
                     String.class, UUID.fromString("093e273b-43d9-4bb1-b275-c9bed2ccb358")))
@@ -371,6 +371,68 @@ class AppointmentPersistenceIT {
                     String.class)).isEqualTo("America/Lima");
             assertThat(fixtureJdbc.queryForObject("select to_regprocedure('capacity_lock_reschedule(uuid,uuid)') "
                     + "is not null", Boolean.class)).isTrue();
+        } finally {
+            jdbcTemplate.execute("drop database if exists " + database + " with (force)");
+        }
+    }
+
+    @Test
+    void backfillsAlreadyStartedAttentionFromV8WithoutInventingStartTime() {
+        String database = "medical_v8_upgrade_test";
+        jdbcTemplate.execute("drop database if exists " + database);
+        jdbcTemplate.execute("create database " + database);
+        try {
+            DriverManagerDataSource isolated = new DriverManagerDataSource(
+                    "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getMappedPort(5432)
+                            + "/" + database,
+                    postgres.getUsername(), postgres.getPassword());
+            JdbcTemplate fixtureJdbc = new JdbcTemplate(isolated);
+            Flyway v2 = Flyway.configure().dataSource(isolated)
+                    .locations("classpath:db/migration").target("2").load();
+            v2.migrate();
+            UUID appointmentId = UUID.randomUUID();
+            insertLegacyV2Data(fixtureJdbc, "public", appointmentId, UUID.randomUUID(), UUID.randomUUID());
+
+            Flyway v8 = Flyway.configure().dataSource(isolated)
+                    .locations("classpath:db/migration").target("8").load();
+            v8.migrate();
+            fixtureJdbc.execute("select capacity_appointment_confirm('" + appointmentId + "')");
+            for (String stage : new String[] {"CHECK_IN", "WAITING", "IN_ATTENTION"}) {
+                fixtureJdbc.execute("select capacity_appointment_stage('" + appointmentId + "', '" + stage + "')");
+            }
+
+            Flyway latest = Flyway.configure().dataSource(isolated)
+                    .locations("classpath:db/migration").load();
+            latest.migrate();
+
+            assertThat(latest.info().current().getVersion().toString()).isEqualTo("18");
+            assertThat(fixtureJdbc.queryForObject(
+                    "select count(*) from clinical_encounters where appointment_id = ?",
+                    Integer.class, appointmentId)).isEqualTo(1);
+            assertThat(fixtureJdbc.queryForObject(
+                    "select count(*) from clinical_final_records", Integer.class)).isZero();
+            assertThat(fixtureJdbc.queryForObject(
+                    "select count(*) from clinical_prescriptions", Integer.class)).isZero();
+            assertThat(fixtureJdbc.queryForObject(
+                    "select legacy_start from clinical_encounters where appointment_id = ?",
+                    Boolean.class, appointmentId)).isTrue();
+            assertThat(fixtureJdbc.queryForObject(
+                    "select started_at from clinical_encounters where appointment_id = ?",
+                    java.sql.Timestamp.class, appointmentId)).isNull();
+            assertThat(fixtureJdbc.queryForObject(
+                    "select simulated_care_type from clinical_encounters where appointment_id = ?",
+                    String.class, appointmentId)).isEqualTo("Consulta externa (dato simulado)");
+            assertThat(fixtureJdbc.queryForObject(
+                    "select simulated_service from clinical_encounters where appointment_id = ?",
+                    String.class, appointmentId)).isEqualTo("Servicio ambulatorio (dato simulado)");
+            assertThat(fixtureJdbc.queryForObject("""
+                    select p.simulated_rne from professionals p
+                    join appointments a on a.professional_id = p.id
+                    where a.id = ?
+                    """, String.class, appointmentId)).startsWith("SIM-RNE-");
+            assertThat(fixtureJdbc.queryForObject(
+                    "select flow_stage from appointments where id = ?",
+                    String.class, appointmentId)).isEqualTo("IN_ATTENTION");
         } finally {
             jdbcTemplate.execute("drop database if exists " + database + " with (force)");
         }
@@ -420,6 +482,11 @@ class AppointmentPersistenceIT {
                 "92000001"
         );
         migrationJdbc.update(
+                "insert into " + schema
+                        + ".professional_specialties (professional_id, specialty_id) values (?, ?)",
+                professionalId, specialtyId
+        );
+        migrationJdbc.update(
                 "insert into " + schema + ".schedules "
                         + "(id, professional_id, specialty_id, day_of_week, start_time, end_time, active) "
                         + "values (?, ?, ?, 1, time '09:00', time '10:00', true)",
@@ -427,9 +494,6 @@ class AppointmentPersistenceIT {
                 professionalId,
                 specialtyId
         );
-        migrationJdbc.update("insert into " + schema
-                + ".professional_specialties (professional_id, specialty_id) values (?, ?)",
-                professionalId, specialtyId);
         migrationJdbc.update(
                 "insert into " + schema + ".availability_slots "
                         + "(id, schedule_id, slot_date, start_time, end_time, status) "

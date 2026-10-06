@@ -2,6 +2,7 @@ package com.hospital.platform.patients.exception;
 
 import com.hospital.platform.patients.controller.PatientController;
 import com.hospital.platform.patients.dto.PatientErrorResponseDTO;
+import com.hospital.platform.patients.domain.InvalidPatientDemographicsException;
 import java.time.Instant;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,9 +29,19 @@ public class PatientExceptionHandler {
         return error(HttpStatus.CONFLICT, "Patient document already exists", "DUPLICATE_DOCUMENT");
     }
 
-    @ExceptionHandler({InvalidDocumentException.class, MethodArgumentNotValidException.class})
-    ResponseEntity<PatientErrorResponseDTO> handleInvalidDocument(Exception exception) {
+    @ExceptionHandler(InvalidDocumentException.class)
+    ResponseEntity<PatientErrorResponseDTO> handleInvalidDocument(InvalidDocumentException exception) {
         return error(HttpStatus.BAD_REQUEST, "Document type or number is invalid", "VALIDATION_ERROR");
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ResponseEntity<PatientErrorResponseDTO> handleInvalidRequest(MethodArgumentNotValidException exception) {
+        return error(HttpStatus.BAD_REQUEST, "Request validation failed", "VALIDATION_ERROR");
+    }
+
+    @ExceptionHandler(InvalidPatientDemographicsException.class)
+    ResponseEntity<PatientErrorResponseDTO> handleInvalidDemographics(InvalidPatientDemographicsException exception) {
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), "VALIDATION_ERROR");
     }
 
     @ExceptionHandler(PatientAlreadyLinkedException.class)

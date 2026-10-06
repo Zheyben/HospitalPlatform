@@ -2,6 +2,7 @@ package com.hospital.platform.professionals.exception;
 
 import com.hospital.platform.professionals.controller.ProfessionalController;
 import com.hospital.platform.professionals.dto.ProfessionalErrorResponseDTO;
+import com.hospital.platform.users.exception.DuplicateEmailException;
 import java.time.Instant;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -24,9 +25,26 @@ public class ProfessionalExceptionHandler {
         return error(HttpStatus.CONFLICT, "Professional license number already exists", "DUPLICATE_PROFESSIONAL");
     }
 
-    @ExceptionHandler({InvalidProfessionalLicenseException.class, MethodArgumentNotValidException.class})
-    ResponseEntity<ProfessionalErrorResponseDTO> handleInvalidLicense(Exception exception) {
-        return error(HttpStatus.BAD_REQUEST, "Professional license must contain 4 to 6 digits", "VALIDATION_ERROR");
+    @ExceptionHandler(DuplicateEmailException.class)
+    ResponseEntity<ProfessionalErrorResponseDTO> handleDuplicateEmail(DuplicateEmailException exception) {
+        return error(HttpStatus.CONFLICT, "Email already exists", "EMAIL_ALREADY_EXISTS");
+    }
+
+    @ExceptionHandler(SpecialtyNotAvailableException.class)
+    ResponseEntity<ProfessionalErrorResponseDTO> handleSpecialtyNotAvailable(SpecialtyNotAvailableException exception) {
+        return error(HttpStatus.BAD_REQUEST, "Specialty is not active or does not exist", "SPECIALTY_NOT_AVAILABLE");
+    }
+
+    @ExceptionHandler(ProfessionalDomainConflictException.class)
+    ResponseEntity<ProfessionalErrorResponseDTO> handleProfessionalDomainConflict(
+            ProfessionalDomainConflictException exception) {
+        return error(HttpStatus.CONFLICT, exception.getMessage(), "PROFESSIONAL_DOMAIN_CONFLICT");
+    }
+
+    @ExceptionHandler({InvalidProfessionalLicenseException.class, MethodArgumentNotValidException.class,
+            IllegalArgumentException.class})
+    ResponseEntity<ProfessionalErrorResponseDTO> handleValidation(Exception exception) {
+        return error(HttpStatus.BAD_REQUEST, "Invalid professional details", "VALIDATION_ERROR");
     }
 
     @ExceptionHandler(AccessDeniedException.class)

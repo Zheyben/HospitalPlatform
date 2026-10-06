@@ -109,7 +109,7 @@ class PatientAvailabilityFlowIT {
         mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
                 {"email":"b2-patient@example.test","password":"strong-password","documentType":"DNI",
                  "documentNumber":"92000001","firstName":"Ana","lastName":"Demo",
-                 "birthDate":"1990-01-01","phone":"3001234567","insurance":"Demo Health"}
+                 "birthDate":"1990-01-01","phone":"3001234567","insurance":"SIS"}
                 """)).andExpect(status().isCreated());
         String loginBody = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"b2-patient@example.test\",\"password\":\"strong-password\"}"))
@@ -118,6 +118,33 @@ class PatientAvailabilityFlowIT {
         UUID patientId = jdbc.queryForObject("""
                 select p.id from patients p join users u on u.id=p.user_id where u.email='b2-patient@example.test'
                 """, UUID.class);
+
+        mvc.perform(get("/patients/search").with(user("reception").roles("RECEPTIONIST"))
+                        .param("documentType", " dni ").param("documentNumber", " 92000001 "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.patientId").value(patientId.toString()))
+                .andExpect(jsonPath("$.patientName").value("Ana Demo"))
+                .andExpect(jsonPath("$.phone").doesNotExist());
+        UUID patientWithoutUser = UUID.randomUUID();
+        jdbc.update("insert into patients (id, document_type, document_number) values (?, 'DNI', '92000002')",
+                patientWithoutUser);
+        mvc.perform(get("/patients/search").with(user("reception").roles("RECEPTIONIST"))
+                        .param("documentType", "DNI").param("documentNumber", "92000002"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.patientId").value(patientWithoutUser.toString()));
+        jdbc.update("update patients set deleted_at=now() where id=?", patientWithoutUser);
+        mvc.perform(get("/patients/search").with(user("reception").roles("RECEPTIONIST"))
+                        .param("documentType", "DNI").param("documentNumber", "92000002"))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/patients/search").with(user("reception").roles("RECEPTIONIST"))
+                        .param("documentType", "DNI").param("documentNumber", "bad"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/patients/search").with(user("patient").roles("PATIENT"))
+                        .param("documentType", "DNI").param("documentNumber", "92000001"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/patients/search").param("documentType", "DNI")
+                        .param("documentNumber", "92000001"))
+                .andExpect(status().isUnauthorized());
         jdbc.queryForObject("select capacity_reserve(?,?,?)", UUID.class,
                 reserved, patientId, "Existing booking");
 
@@ -141,6 +168,17 @@ class PatientAvailabilityFlowIT {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(16));
         mvc.perform(get("/availability").with(user("reception").roles("RECEPTIONIST")))
                 .andExpect(status().isForbidden());
+        mvc.perform(get("/reception/availability")
+                        .with(user("reception").roles("RECEPTIONIST"))
+                        .param("slotDate", tomorrow.plusDays(7).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$[0].professionalName").value("Elena Vargas"));
+        mvc.perform(get("/reception/availability").with(user("patient").roles("PATIENT")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/reception/availability"))
+                .andExpect(status().isUnauthorized());
 
         UUID slotId = UUID.fromString(availability.get(0).get("id").asText());
         String request = "{\"slotId\":\"" + slotId + "\",\"reason\":\"Consulta de demostración\"}";
@@ -165,6 +203,19 @@ class PatientAvailabilityFlowIT {
                             .content("{\"slotId\":\"" + hidden + "\"}"))
                     .andExpect(status().isConflict());
         }
+
+        UUID receptionSlot = UUID.fromString(availability.get(1).get("slotId").asText());
+        mvc.perform(post("/appointments").with(user("reception").roles("RECEPTIONIST"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"patientId\":\"" + patientId + "\",\"slotId\":\""
+                                + receptionSlot + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.patientId").value(patientId.toString()))
+                .andExpect(jsonPath("$.appointmentStatus").value("SCHEDULED"));
+        mvc.perform(get("/reception/availability").with(user("reception").roles("RECEPTIONIST"))
+                        .param("slotDate", tomorrow.plusDays(7).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     private void associate(UUID professional, UUID specialty) {

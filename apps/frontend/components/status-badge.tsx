@@ -1,9 +1,9 @@
 const labels: Record<string, string> = {
-  SCHEDULED: "SCHEDULED",
-  CONFIRMED: "CONFIRMED",
-  CANCELLED: "CANCELLED",
-  RESCHEDULED: "RESCHEDULED",
-  COMPLETED: "COMPLETED",
+  SCHEDULED: "Programada",
+  CONFIRMED: "Confirmada",
+  CANCELLED: "Cancelada",
+  RESCHEDULED: "Reprogramada",
+  COMPLETED: "Finalizada",
 };
 
 export function StatusBadge({ status }: { status: string }) {

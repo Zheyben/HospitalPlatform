@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import java.time.LocalDate;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class RegisterPatientRequestDTOTest {
@@ -15,7 +16,7 @@ class RegisterPatientRequestDTOTest {
     void acceptsValidRegistrationData() {
         assertThat(validator.validate(request(
                 "patient@example.com", "Ana", "Pérez", LocalDate.of(1990, 1, 1),
-                "+573001234567", "Demo Health"
+                "+573001234567", "SIS"
         ))).isEmpty();
     }
 
@@ -26,7 +27,18 @@ class RegisterPatientRequestDTOTest {
         ));
 
         assertThat(violations).extracting(v -> v.getPropertyPath().toString())
-                .contains("email", "firstName", "lastName", "birthDate", "phone", "insurance");
+                .contains("email", "firstName", "lastName", "birthDate", "phone", "insuranceSelectionPresent");
+    }
+
+    @Test
+    void acceptsInsuranceIdWithoutLegacyTextAndRejectsMissingSelection() {
+        RegisterPatientRequestDTO byId = new RegisterPatientRequestDTO(
+                "patient@example.com", "strong-password", "DNI", "12345678", "Ana", "Perez",
+                LocalDate.of(1990, 1, 1), "3001234567", null, null, null, UUID.randomUUID());
+        assertThat(validator.validate(byId)).isEmpty();
+        assertThat(validator.validate(request("patient@example.com", "Ana", "Perez",
+                LocalDate.of(1990, 1, 1), "3001234567", null)))
+                .extracting(v -> v.getPropertyPath().toString()).contains("insuranceSelectionPresent");
     }
 
     private RegisterPatientRequestDTO request(
@@ -34,7 +46,7 @@ class RegisterPatientRequestDTOTest {
     ) {
         return new RegisterPatientRequestDTO(
                 email, "strong-password", "DNI", "12345678", firstName, lastName,
-                birthDate, phone, insurance
+                birthDate, phone, insurance, null, null
         );
     }
 }

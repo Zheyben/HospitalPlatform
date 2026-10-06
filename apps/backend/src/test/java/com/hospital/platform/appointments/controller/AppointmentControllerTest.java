@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hospital.platform.appointments.dto.AppointmentResponseDTO;
+import com.hospital.platform.appointments.dto.ReceptionAppointmentSummaryDTO;
+import com.hospital.platform.appointments.dto.ReceptionWaitingRoomDTO;
 import com.hospital.platform.appointments.entity.AppointmentStatus;
 import com.hospital.platform.appointments.entity.FlowStage;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -20,7 +22,10 @@ import com.hospital.platform.appointments.exception.AppointmentNotFoundException
 import com.hospital.platform.appointments.exception.InvalidAppointmentTransitionException;
 import com.hospital.platform.appointments.exception.SlotUnavailableException;
 import com.hospital.platform.appointments.service.AppointmentService;
+import com.hospital.platform.medical.service.MedicalEncounterService;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,13 +52,16 @@ class AppointmentControllerTest {
     @Mock
     private AppointmentService appointmentService;
 
+    @Mock
+    private MedicalEncounterService medicalEncounterService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
-        mockMvc = MockMvcBuilders.standaloneSetup(new AppointmentController(appointmentService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new AppointmentController(appointmentService, medicalEncounterService))
                 .setControllerAdvice(new AppointmentExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -119,6 +127,45 @@ class AppointmentControllerTest {
         mockMvc.perform(get("/appointments"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(APPOINTMENT_ID.toString()));
+    }
+
+    @Test
+    void bindsFilteredReceptionQueryAndOmitsReason() throws Exception {
+        when(appointmentService.findReceptionAppointments(PATIENT_ID, 50)).thenReturn(List.of(
+                new ReceptionAppointmentSummaryDTO(
+                        APPOINTMENT_ID, PATIENT_ID, "DNI", "94000001", "Ana Demo", "Luis Rojas",
+                        "Medicina General", LocalDate.of(2026, 10, 6), LocalTime.of(9, 0),
+                        LocalTime.of(9, 30), AppointmentStatus.CONFIRMED, FlowStage.WAITING
+                )));
+
+        mockMvc.perform(get("/appointments/reception").param("patientId", PATIENT_ID.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].appointmentId").value(APPOINTMENT_ID.toString()))
+                .andExpect(jsonPath("$[0].patientName").value("Ana Demo"))
+                .andExpect(jsonPath("$[0].flowStage").value("WAITING"))
+                .andExpect(jsonPath("$[0].reason").doesNotExist());
+        verify(appointmentService).findReceptionAppointments(PATIENT_ID, 50);
+
+        mockMvc.perform(get("/appointments/reception"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void bindsWaitingRoomPageAndOmitsSensitiveFields() throws Exception {
+        when(appointmentService.findReceptionWaitingRoom(20, 10)).thenReturn(List.of(
+                new ReceptionWaitingRoomDTO(APPOINTMENT_ID, "Ana Demo", LocalTime.of(9, 0),
+                        "Luis Rojas", "Medicina General", FlowStage.WAITING)));
+
+        mockMvc.perform(get("/appointments/reception/waiting-room")
+                        .param("limit", "20").param("offset", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].appointmentId").value(APPOINTMENT_ID.toString()))
+                .andExpect(jsonPath("$[0].patientDisplay").value("Ana Demo"))
+                .andExpect(jsonPath("$[0].flowStage").value("WAITING"))
+                .andExpect(jsonPath("$[0].reason").doesNotExist())
+                .andExpect(jsonPath("$[0].documentNumber").doesNotExist());
+        verify(appointmentService).findReceptionWaitingRoom(20, 10);
     }
 
     @Test
@@ -235,8 +282,9 @@ class AppointmentControllerTest {
                 .thenReturn(response(AppointmentStatus.CONFIRMED, FlowStage.CHECK_IN));
         when(appointmentService.moveAppointmentToWaiting(APPOINTMENT_ID))
                 .thenReturn(response(AppointmentStatus.CONFIRMED, FlowStage.WAITING));
-        when(appointmentService.startAppointmentAttention(APPOINTMENT_ID))
-                .thenReturn(response(AppointmentStatus.CONFIRMED, FlowStage.IN_ATTENTION));
+        when(medicalEncounterService.start(APPOINTMENT_ID))
+                .thenReturn(new MedicalEncounterService.StartResult(
+                        null, response(AppointmentStatus.CONFIRMED, FlowStage.IN_ATTENTION)));
         when(appointmentService.completeAppointment(APPOINTMENT_ID))
                 .thenReturn(response(AppointmentStatus.COMPLETED, FlowStage.FINISHED));
 

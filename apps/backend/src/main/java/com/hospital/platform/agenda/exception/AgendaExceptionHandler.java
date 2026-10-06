@@ -41,6 +41,11 @@ public class AgendaExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, exception.getMessage(), "INVALID_SCHEDULE_TIME");
     }
 
+    @ExceptionHandler(InactiveAgendaException.class)
+    ResponseEntity<AgendaErrorResponseDTO> handleInactiveAgenda(InactiveAgendaException exception) {
+        return error(HttpStatus.CONFLICT, exception.getMessage(), "AGENDA_INACTIVE");
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<AgendaErrorResponseDTO> handleInvalidAssociation(IllegalArgumentException exception) {
         return error(HttpStatus.BAD_REQUEST, exception.getMessage(), "INVALID_PROFESSIONAL_SPECIALTY_ASSOCIATION");

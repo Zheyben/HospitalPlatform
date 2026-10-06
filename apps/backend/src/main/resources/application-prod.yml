@@ -12,6 +12,8 @@ spring:
     show-sql: false
   flyway:
     enabled: true
+    user: ${FLYWAY_USERNAME}
+    password: ${FLYWAY_PASSWORD}
 
 server:
   shutdown: graceful

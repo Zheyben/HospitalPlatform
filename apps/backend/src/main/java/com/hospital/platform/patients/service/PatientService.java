@@ -3,9 +3,12 @@ package com.hospital.platform.patients.service;
 import com.hospital.platform.patients.dto.CreatePatientRequestDTO;
 import com.hospital.platform.patients.dto.LinkUserRequestDTO;
 import com.hospital.platform.patients.dto.PatientResponseDTO;
+import com.hospital.platform.patients.dto.ReceptionPatientSearchDTO;
 import com.hospital.platform.patients.dto.UpdatePatientRequestDTO;
+import com.hospital.platform.patients.dto.UpdatePatientDemographicsRequestDTO;
 import com.hospital.platform.patients.dto.UpdatePatientStatusRequestDTO;
 import com.hospital.platform.patients.domain.DocumentIdentity;
+import com.hospital.platform.patients.domain.PatientDemographics;
 import com.hospital.platform.patients.entity.Patient;
 import com.hospital.platform.patients.exception.DuplicateDocumentException;
 import com.hospital.platform.patients.exception.PatientAlreadyLinkedException;
@@ -14,10 +17,12 @@ import com.hospital.platform.patients.exception.UserAlreadyLinkedException;
 import com.hospital.platform.patients.exception.UserNotFoundException;
 import com.hospital.platform.patients.mapper.PatientMapper;
 import com.hospital.platform.patients.repository.PatientRepository;
+import com.hospital.platform.patients.repository.ReceptionPatientSearchRow;
 import com.hospital.platform.users.service.CurrentUserService;
 import com.hospital.platform.users.service.UserLookupService;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +51,7 @@ public class PatientService {
     public PatientResponseDTO createPatient(CreatePatientRequestDTO request) {
         return createPatientRecord(
                 request.documentType(), request.documentNumber(), request.birthDate(),
-                request.phone(), request.address(), null, null
+                request.phone(), request.address(), null, null, null, null, PatientDemographics.empty()
         );
     }
 
@@ -57,16 +62,49 @@ public class PatientService {
             String documentNumber,
             LocalDate birthDate,
             String phone,
-            String insurance
+            String insurance,
+            UUID insuranceId,
+            String address,
+            String sex
     ) {
+        return registerPatient(userId, documentType, documentNumber, birthDate, phone, insurance,
+                insuranceId, address, sex, PatientDemographics.empty());
+    }
+
+    @Transactional
+    public PatientResponseDTO registerPatient(
+            UUID userId, String documentType, String documentNumber, LocalDate birthDate,
+            String phone, String insurance, UUID insuranceId, String address, String sex,
+            PatientDemographics demographics
+    ) {
+        demographics.requireValidAffiliation(insurance);
         return createPatientRecord(
-                documentType, documentNumber, birthDate, phone, null, insurance, userId
+                documentType, documentNumber, birthDate, phone,
+                address == null || address.isBlank() ? null : address, insurance, insuranceId, userId,
+                sex == null || sex.isBlank() ? null : sex.trim(), demographics
         );
     }
 
     @Transactional(readOnly = true)
     public List<PatientResponseDTO> findPatients() {
         return patientMapper.toResponseList(patientRepository.findAllByDeletedAtIsNullOrderByCreatedAtDesc());
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ReceptionPatientSearchDTO> findForReceptionByDocument(
+            String documentType, String documentNumber
+    ) {
+        String type = DocumentIdentity.type(documentType);
+        String number = DocumentIdentity.number(documentNumber);
+        DocumentIdentity.requireValid(type, number);
+        return patientRepository.findActiveForReceptionByDocument(type, number)
+                .map(this::toReceptionSearch);
+    }
+
+    private ReceptionPatientSearchDTO toReceptionSearch(ReceptionPatientSearchRow row) {
+        return new ReceptionPatientSearchDTO(
+                row.getPatientId(), row.getDocumentType(), row.getDocumentNumber(), row.getPatientName()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -101,6 +139,18 @@ public class PatientService {
                 normalizeNullable(request.address())
         );
 
+        return patientMapper.toResponse(patient);
+    }
+
+    @Transactional
+    public PatientResponseDTO updateDemographics(UUID patientId, UpdatePatientDemographicsRequestDTO request) {
+        Patient patient = findActivePatient(patientId);
+        PatientDemographics demographics = new PatientDemographics(
+                request.maritalStatus(), request.occupation(), request.district(), request.educationLevel(),
+                request.affiliationNumber(), request.emergencyContactName(),
+                request.emergencyContactRelationship(), request.emergencyContactPhone());
+        demographics.requireValidAffiliation(patient.getInsurance());
+        patient.setDemographics(demographics);
         return patientMapper.toResponse(patient);
     }
 
@@ -149,7 +199,10 @@ public class PatientService {
             String phone,
             String address,
             String insurance,
-            UUID userId
+            UUID insuranceId,
+            UUID userId,
+            String sex,
+            PatientDemographics demographics
     ) {
         String normalizedDocumentType = DocumentIdentity.type(documentType);
         String normalizedDocumentNumber = DocumentIdentity.number(documentNumber);
@@ -164,9 +217,13 @@ public class PatientService {
                 normalizeNullable(phone),
                 normalizeNullable(address)
         );
-        if (insurance != null) {
-            patient.setInsurance(insurance.trim());
+        if (insuranceId != null) {
+            patient.setInsurance(insuranceId, insurance);
         }
+        if (sex != null) {
+            patient.setSex(sex);
+        }
+        patient.setDemographics(demographics);
         if (userId != null) {
             patient.linkUser(userId);
         }

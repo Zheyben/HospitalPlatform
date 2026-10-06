@@ -23,6 +23,7 @@ public interface CapacityGateway {
     void scheduleStatus(UUID scheduleId, boolean active);
     boolean generateSlot(UUID scheduleId, LocalDate date, LocalTime startTime, LocalTime endTime);
     void deactivateProfessional(UUID professionalId);
+    void reactivateProfessional(UUID professionalId);
     void disableUser(UUID userId);
     void setUserEnabled(UUID userId, boolean enabled);
     void lockUser(UUID userId);

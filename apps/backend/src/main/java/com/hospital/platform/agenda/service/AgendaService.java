@@ -1,6 +1,7 @@
 package com.hospital.platform.agenda.service;
 
 import com.hospital.platform.agenda.dto.AgendaResponseDTO;
+import com.hospital.platform.agenda.dto.AgendaPublicationResponseDTO;
 import com.hospital.platform.agenda.dto.AvailabilitySlotResponseDTO;
 import com.hospital.platform.agenda.dto.CreateAgendaRequestDTO;
 import com.hospital.platform.agenda.dto.UpdateAgendaRequestDTO;
@@ -9,6 +10,7 @@ import com.hospital.platform.agenda.entity.AvailabilitySlotStatus;
 import com.hospital.platform.agenda.entity.Schedule;
 import com.hospital.platform.agenda.contract.CapacityGateway;
 import com.hospital.platform.agenda.exception.AgendaNotFoundException;
+import com.hospital.platform.agenda.exception.InactiveAgendaException;
 import com.hospital.platform.agenda.exception.AvailabilitySlotNotFoundException;
 import com.hospital.platform.agenda.exception.InvalidScheduleTimeException;
 import com.hospital.platform.agenda.exception.ProfessionalNotAvailableException;
@@ -37,13 +39,15 @@ public class AgendaService {
     private final AgendaMapper agendaMapper;
     private final Clock clock;
     private final CapacityGateway capacityGateway;
+    private final SlotGenerationService slotGenerationService;
 
     public AgendaService(
             ScheduleRepository scheduleRepository,
             AvailabilitySlotRepository availabilitySlotRepository,
             ProfessionalLookupService professionalLookupService,
             Clock clock,
-            CapacityGateway capacityGateway
+            CapacityGateway capacityGateway,
+            SlotGenerationService slotGenerationService
     ) {
         this.scheduleRepository = scheduleRepository;
         this.availabilitySlotRepository = availabilitySlotRepository;
@@ -51,6 +55,7 @@ public class AgendaService {
         this.agendaMapper = new AgendaMapper();
         this.clock = clock;
         this.capacityGateway = capacityGateway;
+        this.slotGenerationService = slotGenerationService;
     }
 
     @Transactional
@@ -93,6 +98,16 @@ public class AgendaService {
         return agendaMapper.toAgendaResponse(findSchedule(agendaId));
     }
 
+    @Transactional
+    public AgendaPublicationResponseDTO publishAgenda(UUID agendaId) {
+        Schedule schedule = findSchedule(agendaId);
+        if (!schedule.isActive()) {
+            throw new InactiveAgendaException();
+        }
+        int created = slotGenerationService.generate(agendaId);
+        return new AgendaPublicationResponseDTO(agendaId, created, SlotGenerationService.HORIZON_DAYS);
+    }
+
     @Transactional(readOnly = true)
     public List<AvailabilitySlotResponseDTO> findAvailability(
             UUID scheduleId,
@@ -109,6 +124,16 @@ public class AgendaService {
         return agendaMapper.toAvailabilityResponseList(
                 availabilitySlotRepository.findAvailability(scheduleId, professionalId, slotDate, status)
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<AvailabilitySlotResponseDTO> findReceptionAvailability(
+            UUID scheduleId, UUID professionalId, LocalDate slotDate
+    ) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        return availabilitySlotRepository.findPatientAvailability(
+                        scheduleId, professionalId, slotDate, now.toLocalDate(), now.toLocalTime())
+                .stream().map(this::toPatientResponse).toList();
     }
 
     private AvailabilitySlotResponseDTO toPatientResponse(PatientAvailabilityRow row) {

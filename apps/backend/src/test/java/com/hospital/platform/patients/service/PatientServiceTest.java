@@ -36,6 +36,7 @@ class PatientServiceTest {
 
     private static final UUID PATIENT_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
     private static final UUID USER_ID = UUID.fromString("77777777-7777-7777-7777-777777777777");
+    private static final UUID INSURANCE_ID = UUID.fromString("a0000000-0000-4000-8000-000000000001");
 
     @Mock
     private PatientRepository patientRepository;
@@ -92,12 +93,16 @@ class PatientServiceTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         PatientResponseDTO response = patientService.registerPatient(
-                USER_ID, "dni", "12345678", LocalDate.of(1990, 1, 1), " +57 300 1234567 ", " Demo Health "
+                USER_ID, "dni", "12345678", LocalDate.of(1990, 1, 1), " +57 300 1234567 ",
+                "SIS", INSURANCE_ID, "  Avenida Lima 123  ", "  Femenino  "
         );
 
         assertThat(response.userId()).isEqualTo(USER_ID);
-        assertThat(response.insurance()).isEqualTo("Demo Health");
+        assertThat(response.insurance()).isEqualTo("SIS");
+        assertThat(response.insuranceId()).isEqualTo(INSURANCE_ID);
         assertThat(response.documentType()).isEqualTo("DNI");
+        assertThat(response.address()).isEqualTo("Avenida Lima 123");
+        assertThat(response.sex()).isEqualTo("Femenino");
     }
 
     @Test
@@ -105,7 +110,8 @@ class PatientServiceTest {
         when(patientRepository.existsByDocumentTypeAndDocumentNumber("DNI", "12345678")).thenReturn(true);
 
         assertThatThrownBy(() -> patientService.registerPatient(
-                USER_ID, "DNI", "12345678", LocalDate.of(1990, 1, 1), "3001234567", "Demo Health"
+                USER_ID, "DNI", "12345678", LocalDate.of(1990, 1, 1), "3001234567", "SIS", INSURANCE_ID,
+                null, null
         )).isInstanceOf(DuplicateDocumentException.class);
         verify(patientRepository, org.mockito.Mockito.never()).saveAndFlush(any(Patient.class));
     }

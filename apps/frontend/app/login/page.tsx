@@ -19,9 +19,9 @@ function LoginForm() {
     setPending(true);
     setError("");
     try {
-      await apiRequest("/api/session/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
+      const session = await apiRequest<{ destination: string }>("/api/session/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
       setPassword("");
-      router.replace("/patient/availability");
+      router.replace(session.destination);
       router.refresh();
     } catch (cause) {
       setError(cause instanceof ApiRequestError && cause.status === 401 ? "Correo o contraseña incorrectos." : cause instanceof Error ? cause.message : "No se pudo iniciar sesión.");

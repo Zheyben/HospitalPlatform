@@ -9,8 +9,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.hospital.platform.agenda.dto.AgendaResponseDTO;
+import com.hospital.platform.agenda.dto.AgendaPublicationResponseDTO;
 import com.hospital.platform.agenda.exception.AgendaExceptionHandler;
 import com.hospital.platform.agenda.exception.AgendaNotFoundException;
+import com.hospital.platform.agenda.exception.InactiveAgendaException;
 import com.hospital.platform.agenda.service.AgendaService;
 import java.time.LocalTime;
 import java.util.List;
@@ -86,6 +88,27 @@ class AgendaControllerTest {
         mockMvc.perform(get("/agendas/{id}", AGENDA_ID))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("AGENDA_NOT_FOUND"));
+    }
+
+    @Test
+    void publishesSlotsAndReturnsCreatedCount() throws Exception {
+        when(agendaService.publishAgenda(AGENDA_ID))
+                .thenReturn(new AgendaPublicationResponseDTO(AGENDA_ID, 12, 14));
+
+        mockMvc.perform(post("/agendas/{id}/publish", AGENDA_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scheduleId").value(AGENDA_ID.toString()))
+                .andExpect(jsonPath("$.createdSlots").value(12))
+                .andExpect(jsonPath("$.horizonDays").value(14));
+    }
+
+    @Test
+    void rejectsPublicationOfInactiveAgenda() throws Exception {
+        when(agendaService.publishAgenda(AGENDA_ID)).thenThrow(new InactiveAgendaException());
+
+        mockMvc.perform(post("/agendas/{id}/publish", AGENDA_ID))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("AGENDA_INACTIVE"));
     }
 
     @Test

@@ -126,8 +126,8 @@ La matriz siguiente distingue autorizaciones vigentes de operaciones históricas
   ------------------------- --------------- ---------------------
   POST /appointments        PATIENT / ADMIN / RECEPTIONIST  Rol y ownership actuales
   POST /appointments/{id}/confirm PATIENT / ADMIN / RECEPTIONIST  Lifecycle según ownership
-  POST /appointments/{id}/cancel PATIENT / ADMIN / RECEPTIONIST  Lifecycle según ownership
-  POST /appointments/{id}/reschedule PATIENT / ADMIN / RECEPTIONIST  Lifecycle según ownership
+  POST /appointments/{id}/cancel PATIENT / ADMIN  Lifecycle según ownership; RECEPTIONIST recibe 403
+  POST /appointments/{id}/reschedule PATIENT / ADMIN  Lifecycle según ownership; RECEPTIONIST recibe 403
   POST /appointments/{id}/check-in RECEPTIONIST Appointment Operations
   POST /appointments/{id}/waiting RECEPTIONIST Appointment Operations
   POST /appointments/{id}/start-attention PROFESSIONAL Own professional appointment

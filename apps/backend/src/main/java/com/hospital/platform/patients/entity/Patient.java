@@ -1,5 +1,6 @@
 package com.hospital.platform.patients.entity;
 
+import com.hospital.platform.patients.domain.PatientDemographics;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -38,8 +39,38 @@ public class Patient {
     @Column(length = 150)
     private String insurance;
 
+    @Column(name = "insurance_id")
+    private UUID insuranceId;
+
     @Column(columnDefinition = "TEXT")
     private String address;
+
+    @Column(length = 50)
+    private String sex;
+
+    @Column(name = "marital_status", length = 80)
+    private String maritalStatus;
+
+    @Column(length = 120)
+    private String occupation;
+
+    @Column(length = 120)
+    private String district;
+
+    @Column(name = "education_level", length = 120)
+    private String educationLevel;
+
+    @Column(name = "affiliation_number", length = 60)
+    private String affiliationNumber;
+
+    @Column(name = "emergency_contact_name", length = 150)
+    private String emergencyContactName;
+
+    @Column(name = "emergency_contact_relationship", length = 80)
+    private String emergencyContactRelationship;
+
+    @Column(name = "emergency_contact_phone", length = 50)
+    private String emergencyContactPhone;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
@@ -113,8 +144,26 @@ public class Patient {
         touch();
     }
 
-    public void setInsurance(String insurance) {
+    public void setInsurance(UUID insuranceId, String insurance) {
+        this.insuranceId = insuranceId;
         this.insurance = insurance;
+        touch();
+    }
+
+    public void setSex(String sex) {
+        this.sex = sex;
+        touch();
+    }
+
+    public void setDemographics(PatientDemographics demographics) {
+        maritalStatus = demographics.maritalStatus();
+        occupation = demographics.occupation();
+        district = demographics.district();
+        educationLevel = demographics.educationLevel();
+        affiliationNumber = demographics.affiliationNumber();
+        emergencyContactName = demographics.emergencyContactName();
+        emergencyContactRelationship = demographics.emergencyContactRelationship();
+        emergencyContactPhone = demographics.emergencyContactPhone();
         touch();
     }
 
@@ -146,8 +195,21 @@ public class Patient {
         return insurance;
     }
 
+    public UUID getInsuranceId() {
+        return insuranceId;
+    }
+
     public String getAddress() {
         return address;
+    }
+
+    public String getSex() {
+        return sex;
+    }
+
+    public PatientDemographics getDemographics() {
+        return new PatientDemographics(maritalStatus, occupation, district, educationLevel,
+                affiliationNumber, emergencyContactName, emergencyContactRelationship, emergencyContactPhone);
     }
 
     public LocalDateTime getDeletedAt() {

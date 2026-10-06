@@ -43,7 +43,13 @@ test("patient registration, login, availability, booking, conflict and appointme
     await page.getByLabel("Apellido").fill("Prueba");
     await page.getByLabel("Fecha de nacimiento").fill("1993-06-15");
     await page.getByLabel("Teléfono").fill("+573001234567");
-    await page.getByLabel("Aseguradora").fill("Demo Salud");
+    await page.getByLabel("Seguro", { exact: true }).selectOption({ label: "SIS" });
+  }
+
+  async function chooseFirstAvailable() {
+    await page.getByLabel("Especialidad").selectOption({ index: 1 });
+    await page.getByLabel("Profesional").selectOption({ index: 1 });
+    await page.getByLabel("Fecha", { exact: true }).selectOption({ index: 1 });
   }
 
   await fillRegistration(email, documentNumber);
@@ -79,7 +85,7 @@ test("patient registration, login, availability, booking, conflict and appointme
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
   const loggedIn = await loginResponse;
   expect(loggedIn.status()).toBe(200);
-  expect(await loggedIn.json()).toEqual({ authenticated: true });
+  expect(await loggedIn.json()).toEqual({ authenticated: true, destination: "/patient/availability" });
   await expect(page).toHaveURL(/\/patient\/availability$/);
   const sessionCookies = await context.cookies();
   expect(sessionCookies.find(cookie => cookie.name === "hp_access")?.httpOnly).toBe(true);
@@ -91,6 +97,7 @@ test("patient registration, login, availability, booking, conflict and appointme
   });
   expect(forgedPatient).toBe(403);
 
+  await chooseFirstAvailable();
   await expect(page.getByRole("button", { name: "Seleccionar" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Seleccionar" }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
@@ -105,12 +112,14 @@ test("patient registration, login, availability, booking, conflict and appointme
   const appointment = await booked.json();
   expect(appointment.appointmentStatus).toBe("SCHEDULED");
   await expect(page.getByText("Cita registrada correctamente")).toBeVisible();
-  await expect(page.getByText("Estado:")).toContainText("SCHEDULED");
+  await expect(page.getByText("Estado:")).toContainText("Programada");
 
   await page.goto("/patient/appointments");
   await expect(page.getByText(appointment.id)).toBeVisible();
   await expect(page.getByText("Consulta de demostración B3")).toBeVisible();
-  await expect(page.getByText("SCHEDULED")).toBeVisible();
+  await expect(page.getByText("Programada")).toBeVisible();
+  await expect(page.getByText("Profesional", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fecha y hora (Lima)")).toBeVisible();
   await page.screenshot({ path: "test-results/b31-my-appointments.png", fullPage: true });
 
   const secondAttempt = await browserPost(appointment.slotId, "Segundo intento");
@@ -118,6 +127,7 @@ test("patient registration, login, availability, booking, conflict and appointme
   expect(secondAttempt.body.errorCode).toBe("SLOT_UNAVAILABLE");
 
   await page.goto("/patient/availability");
+  await chooseFirstAvailable();
   await expect(page.getByRole("button", { name: "Seleccionar" }).first()).toBeVisible();
   const raceSlotId = await page.getByRole("button", { name: "Seleccionar" }).first().getAttribute("data-slot-id");
   expect(raceSlotId).toBeTruthy();
@@ -136,6 +146,7 @@ test("patient registration, login, availability, booking, conflict and appointme
   });
   await page.reload();
   await expect(page.getByText("Cargando disponibilidad…")).toBeVisible();
+  await chooseFirstAvailable();
   await expect(page.getByRole("button", { name: "Seleccionar" }).first()).toBeVisible();
   await page.unrouteAll();
 

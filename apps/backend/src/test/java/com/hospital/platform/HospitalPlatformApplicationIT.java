@@ -1,6 +1,8 @@
 package com.hospital.platform;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.hospital.platform.agenda.contract.AvailabilitySlotService;
 import java.sql.Date;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -24,6 +27,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -78,6 +82,9 @@ class HospitalPlatformApplicationIT {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private Clock clock;
+
     @BeforeEach
     void setUpAgendaData() {
         jdbcTemplate.execute("truncate table appointments, availability_slots, schedules, "
@@ -125,7 +132,7 @@ class HospitalPlatformApplicationIT {
 
     @Test
     void contextLoadsAndAppliesMigrationsThroughRefreshTokens() {
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("5");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("18");
 
         Integer rolesTableCount = jdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables "
@@ -138,11 +145,108 @@ class HospitalPlatformApplicationIT {
 
         assertThat(rolesTableCount).isEqualTo(1);
         assertThat(refreshTokensTableCount).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from roles where name='PROFESSIONAL'", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void createsProfessionalAccountWithOneSpecialtyAndChangesStatus() throws Exception {
+        String email = "doctor-" + UUID.randomUUID() + "@example.test";
+        String request = """
+                {"firstName":"Ana","lastName":"Ruiz","email":"%s",
+                 "password":"SecurePass123","licenseNumber":"12345","specialtyId":"%s"}
+                """.formatted(email, SPECIALTY_ID);
+
+        mockMvc.perform(post("/professionals").contentType(MediaType.APPLICATION_JSON).content(request))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.firstName").value("Ana"))
+                .andExpect(jsonPath("$.specialtyId").value(SPECIALTY_ID.toString()));
+
+        UUID createdId = jdbcTemplate.queryForObject("""
+                select p.id from professionals p join users u on u.id=p.user_id where u.email=?
+                """, UUID.class, email);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from professional_specialties where professional_id=?
+                """, Integer.class, createdId)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                select u.password_hash from users u join professionals p on p.user_id=u.id where p.id=?
+                """, String.class, createdId)).isNotEqualTo("SecurePass123");
+
+        mockMvc.perform(patch("/professionals/{id}/status", createdId)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
+        mockMvc.perform(patch("/professionals/{id}/status", createdId)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.active").value(true));
+
+        jdbcTemplate.update("insert into specialties(id,name) values (?,?)",
+                INVALID_SPECIALTY_ID, "Second specialty");
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                insert into professional_specialties(professional_id,specialty_id) values (?,?)
+                """, createdId, INVALID_SPECIALTY_ID))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
     void reportsAvailableSlotWithActiveScheduleAsUsable() {
         assertThat(availabilitySlotService.isUsable(AVAILABLE_ACTIVE_SLOT_ID)).isTrue();
+    }
+
+    @Test
+    void adminPublishesNewScheduleAndPatientCanSeeSlots() throws Exception {
+        LocalDate tomorrow = LocalDate.now(clock).plusDays(1);
+        int dayOfWeek = tomorrow.getDayOfWeek().getValue() % 7;
+        String request = """
+                {"professionalId":"%s","specialtyId":"%s","dayOfWeek":%d,
+                 "startTime":"13:00:00","endTime":"14:00:00"}
+                """.formatted(PROFESSIONAL_ID, SPECIALTY_ID, dayOfWeek);
+
+        mockMvc.perform(post("/agendas").with(user("admin").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON).content(request))
+                .andExpect(status().isCreated());
+        UUID scheduleId = jdbcTemplate.queryForObject("""
+                select id from schedules where professional_id=? and start_time=time '13:00'
+                """, UUID.class, PROFESSIONAL_ID);
+
+        mockMvc.perform(post("/agendas/{id}/publish", scheduleId)
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/agendas/{id}/publish", scheduleId)
+                        .with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdSlots").value(4))
+                .andExpect(jsonPath("$.horizonDays").value(14));
+        mockMvc.perform(post("/agendas/{id}/publish", scheduleId)
+                        .with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdSlots").value(0));
+        mockMvc.perform(get("/availability").param("scheduleId", scheduleId.toString())
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(4));
+
+        String changedHours = """
+                {"professionalId":"%s","specialtyId":"%s","dayOfWeek":%d,
+                 "startTime":"14:00:00","endTime":"15:00:00"}
+                """.formatted(PROFESSIONAL_ID, SPECIALTY_ID, dayOfWeek);
+        mockMvc.perform(put("/agendas/{id}", scheduleId).with(user("admin").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON).content(changedHours))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("AGENDA_CAPACITY_CONFLICT"));
+        mockMvc.perform(patch("/agendas/{id}/status", scheduleId)
+                        .with(user("admin").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"active\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+        mockMvc.perform(post("/agendas/{id}/publish", scheduleId)
+                        .with(user("admin").roles("ADMIN")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("AGENDA_INACTIVE"));
+        mockMvc.perform(get("/availability").param("scheduleId", scheduleId.toString())
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
@@ -235,6 +339,7 @@ class HospitalPlatformApplicationIT {
                 patch("/agendas/{id}/status", ACTIVE_SCHEDULE_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"active\":false}"),
+                post("/agendas/{id}/publish", ACTIVE_SCHEDULE_ID),
                 get("/availability"),
                 get("/availability/{id}", AVAILABLE_ACTIVE_SLOT_ID)
         );

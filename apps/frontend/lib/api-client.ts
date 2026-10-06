@@ -16,7 +16,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 
   const body = await response.json().catch(() => ({})) as T & ApiError;
   if (!response.ok) {
-    if (response.status === 401 && path.startsWith("/api/patient/")) {
+    if (response.status === 401 && (path.startsWith("/api/patient/") || path.startsWith("/api/portal/"))) {
       window.location.assign("/login?expired=1");
     }
     throw new ApiRequestError(response.status, body.errorCode ?? "API_ERROR", body.message ?? "Ocurrió un error. Inténtalo de nuevo.");

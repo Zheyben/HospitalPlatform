@@ -24,3 +24,15 @@ export type Appointment = {
   reason: string;
   createdAt: string;
 };
+
+export type PatientAppointmentSummary = {
+  appointmentId: string;
+  status: string;
+  flowStage: string | null;
+  reason: string | null;
+  specialtyName: string;
+  professionalName: string;
+  appointmentDate: string;
+  startTime: string;
+  endTime: string;
+};

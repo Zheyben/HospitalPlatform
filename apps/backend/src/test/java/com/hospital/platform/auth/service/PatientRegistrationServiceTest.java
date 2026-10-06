@@ -9,7 +9,11 @@ import static org.mockito.Mockito.when;
 import com.hospital.platform.auth.dto.RegisterPatientRequestDTO;
 import com.hospital.platform.auth.dto.RegisterPatientResponseDTO;
 import com.hospital.platform.patients.dto.PatientResponseDTO;
+import com.hospital.platform.patients.dto.InsuranceOptionDTO;
+import com.hospital.platform.patients.domain.PatientDemographics;
 import com.hospital.platform.patients.exception.DuplicateDocumentException;
+import com.hospital.platform.patients.service.InsuranceCatalogService;
+import com.hospital.platform.patients.service.InvalidInsuranceException;
 import com.hospital.platform.patients.service.PatientService;
 import com.hospital.platform.users.entity.User;
 import com.hospital.platform.users.exception.DuplicateEmailException;
@@ -34,20 +38,24 @@ class PatientRegistrationServiceTest {
 
     private static final UUID USER_ID = UUID.fromString("55555555-5555-5555-5555-555555555551");
     private static final UUID PATIENT_ID = UUID.fromString("66666666-6666-6666-6666-666666666661");
+    private static final UUID INSURANCE_ID = UUID.fromString("a0000000-0000-4000-8000-000000000001");
 
     @Mock private UserService userService;
     @Mock private PatientService patientService;
+    @Mock private InsuranceCatalogService insuranceCatalog;
 
     private PatientRegistrationService registrationService;
 
     @BeforeEach
     void setUp() {
-        registrationService = new PatientRegistrationService(userService, patientService);
+        registrationService = new PatientRegistrationService(userService, patientService, insuranceCatalog);
     }
 
     @Test
     void registersAccountAndLinkedPatientWithoutReturningPassword() {
         RegisterPatientRequestDTO request = request();
+        when(insuranceCatalog.resolve(null, "SIS"))
+                .thenReturn(new InsuranceOptionDTO(INSURANCE_ID, "SIS", "SIS"));
         User user = new User(USER_ID, "patient-generated", "patient@example.com", "bcrypt-hash", true);
         user.setNames("Ana", "Pérez");
         when(userService.registerPatientUser(
@@ -55,10 +63,10 @@ class PatientRegistrationServiceTest {
         )).thenReturn(user);
         when(patientService.registerPatient(
                 USER_ID, request.documentType(), request.documentNumber(), request.birthDate(),
-                request.phone(), request.insurance()
+                request.phone(), "SIS", INSURANCE_ID, request.address(), request.sex(), PatientDemographics.empty()
         )).thenReturn(new PatientResponseDTO(
                 PATIENT_ID, USER_ID, "DNI", "12345678", request.birthDate(),
-                request.phone(), request.insurance(), null, true
+                request.phone(), "SIS", INSURANCE_ID, "Avenida Lima 123", "Femenino", true
         ));
 
         RegisterPatientResponseDTO response = registrationService.register(request);
@@ -66,18 +74,24 @@ class PatientRegistrationServiceTest {
         assertThat(response.userId()).isEqualTo(USER_ID);
         assertThat(response.patientId()).isEqualTo(PATIENT_ID);
         assertThat(response.email()).isEqualTo("patient@example.com");
-        assertThat(response.insurance()).isEqualTo("Demo Health");
+        assertThat(response.insurance()).isEqualTo("SIS");
+        assertThat(response.insuranceId()).isEqualTo(INSURANCE_ID);
+        assertThat(response.address()).isEqualTo("Avenida Lima 123");
+        assertThat(response.sex()).isEqualTo("Femenino");
         assertThat(RegisterPatientResponseDTO.class.getRecordComponents())
                 .extracting(component -> component.getName())
                 .doesNotContain("password", "passwordHash", "roles");
         verify(patientService).registerPatient(
-                USER_ID, "DNI", "12345678", request.birthDate(), "3001234567", "Demo Health"
+                USER_ID, "DNI", "12345678", request.birthDate(), "3001234567", "SIS", INSURANCE_ID,
+                "  Avenida Lima 123  ", "  Femenino  ", PatientDemographics.empty()
         );
     }
 
     @Test
     void duplicateEmailStopsBeforeCreatingPatient() {
         RegisterPatientRequestDTO request = request();
+        when(insuranceCatalog.resolve(null, "SIS"))
+                .thenReturn(new InsuranceOptionDTO(INSURANCE_ID, "SIS", "SIS"));
         when(userService.registerPatientUser(
                 request.email(), request.password(), request.firstName(), request.lastName()
         )).thenThrow(new DuplicateEmailException(request.email()));
@@ -88,15 +102,27 @@ class PatientRegistrationServiceTest {
     }
 
     @Test
+    void invalidInsuranceStopsBeforeCreatingUser() {
+        RegisterPatientRequestDTO request = request();
+        when(insuranceCatalog.resolve(null, "SIS")).thenThrow(new InvalidInsuranceException());
+
+        assertThatThrownBy(() -> registrationService.register(request))
+                .isInstanceOf(InvalidInsuranceException.class);
+        verifyNoInteractions(userService, patientService);
+    }
+
+    @Test
     void patientFailureRollsBackRegistrationTransaction() {
         RegisterPatientRequestDTO request = request();
+        when(insuranceCatalog.resolve(null, "SIS"))
+                .thenReturn(new InsuranceOptionDTO(INSURANCE_ID, "SIS", "SIS"));
         User user = new User(USER_ID, "patient-generated", "patient@example.com", "bcrypt-hash", true);
         when(userService.registerPatientUser(
                 request.email(), request.password(), request.firstName(), request.lastName()
         )).thenReturn(user);
         when(patientService.registerPatient(
                 USER_ID, request.documentType(), request.documentNumber(), request.birthDate(),
-                request.phone(), request.insurance()
+                request.phone(), "SIS", INSURANCE_ID, request.address(), request.sex(), PatientDemographics.empty()
         )).thenThrow(new DuplicateDocumentException(request.documentNumber()));
 
         RecordingTransactionManager transactionManager = new RecordingTransactionManager();
@@ -115,7 +141,7 @@ class PatientRegistrationServiceTest {
     private RegisterPatientRequestDTO request() {
         return new RegisterPatientRequestDTO(
                 "patient@example.com", "plain-password", "DNI", "12345678", "Ana", "Pérez",
-                LocalDate.of(1990, 1, 1), "3001234567", "Demo Health"
+                LocalDate.of(1990, 1, 1), "3001234567", "SIS", "  Avenida Lima 123  ", "  Femenino  "
         );
     }
 

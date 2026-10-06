@@ -7,6 +7,8 @@ import { LogoutButton } from "@/components/logout-button";
 const destinations = [
   { href: "/patient/availability", label: "Inicio / Reservar cita", icon: "calendar" },
   { href: "/patient/appointments", label: "Mis citas", icon: "list" },
+  { href: "/patient/records", label: "Mis atenciones", icon: "list" },
+  { href: "/patient/prescriptions", label: "Mis recetas", icon: "list" },
 ] as const;
 
 function NavIcon({ name }: { name: "calendar" | "list" }) {

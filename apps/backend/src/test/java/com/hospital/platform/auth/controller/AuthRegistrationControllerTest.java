@@ -48,13 +48,13 @@ class AuthRegistrationControllerTest {
         when(registrationService.register(any(RegisterPatientRequestDTO.class)))
                 .thenReturn(new RegisterPatientResponseDTO(
                         UUID.randomUUID(), UUID.randomUUID(), "patient@example.com", "Ana", "Pérez",
-                        "DNI", "12345678", LocalDate.of(1990, 1, 1), "3001234567", "Demo Health"
+                        "DNI", "12345678", LocalDate.of(1990, 1, 1), "3001234567", "SIS", null, null, null
                 ));
 
         mockMvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content(request()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email").value("patient@example.com"))
-                .andExpect(jsonPath("$.insurance").value("Demo Health"))
+                .andExpect(jsonPath("$.insurance").value("SIS"))
                 .andExpect(jsonPath("$.passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.accessToken").doesNotExist());
     }
@@ -97,7 +97,7 @@ class AuthRegistrationControllerTest {
         return """
                 {"email":"patient@example.com","password":"strong-password","documentType":"DNI",
                  "documentNumber":"12345678","firstName":"Ana","lastName":"Pérez",
-                 "birthDate":"1990-01-01","phone":"3001234567","insurance":"Demo Health"}
+                 "birthDate":"1990-01-01","phone":"3001234567","insurance":"SIS"}
                 """;
     }
 }

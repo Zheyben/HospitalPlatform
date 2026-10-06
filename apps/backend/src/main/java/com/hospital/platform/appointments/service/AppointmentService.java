@@ -3,6 +3,9 @@ package com.hospital.platform.appointments.service;
 import com.hospital.platform.agenda.contract.CapacityGateway;
 import com.hospital.platform.appointments.dto.AppointmentResponseDTO;
 import com.hospital.platform.appointments.dto.CreateAppointmentRequestDTO;
+import com.hospital.platform.appointments.dto.PatientAppointmentSummaryDTO;
+import com.hospital.platform.appointments.dto.ReceptionAppointmentSummaryDTO;
+import com.hospital.platform.appointments.dto.ReceptionWaitingRoomDTO;
 import com.hospital.platform.appointments.entity.Appointment;
 import com.hospital.platform.appointments.entity.AppointmentStatus;
 import com.hospital.platform.appointments.entity.FlowStage;
@@ -15,11 +18,17 @@ import com.hospital.platform.appointments.exception.ProfessionalNotAvailableExce
 import com.hospital.platform.appointments.exception.SlotUnavailableException;
 import com.hospital.platform.appointments.mapper.AppointmentMapper;
 import com.hospital.platform.appointments.repository.AppointmentRepository;
+import com.hospital.platform.appointments.repository.PatientAppointmentSummaryRow;
+import com.hospital.platform.appointments.repository.ReceptionAppointmentSummaryRow;
+import com.hospital.platform.appointments.repository.ReceptionWaitingRoomRow;
 import com.hospital.platform.audit.contract.AuditEventType;
 import com.hospital.platform.audit.contract.AuditLogService;
 import com.hospital.platform.patients.contract.PatientLookupService;
 import com.hospital.platform.professionals.contract.ProfessionalLookupService;
 import com.hospital.platform.users.service.CurrentUserService;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
@@ -40,6 +49,8 @@ public class AppointmentService {
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
     private static final String ROLE_RECEPTIONIST = "ROLE_RECEPTIONIST";
     private static final String ROLE_PROFESSIONAL = "ROLE_PROFESSIONAL";
+    private static final int MAX_RECEPTION_RESULTS = 100;
+    private static final ZoneId LIMA = ZoneId.of("America/Lima");
 
     private final AppointmentRepository appointmentRepository;
     private final PatientLookupService patientLookupService;
@@ -48,6 +59,7 @@ public class AppointmentService {
     private final CurrentUserService currentUserService;
     private final AppointmentMapper appointmentMapper;
     private final CapacityGateway capacityGateway;
+    private final Clock clock;
 
     public AppointmentService(
             AppointmentRepository appointmentRepository,
@@ -56,7 +68,8 @@ public class AppointmentService {
             @Lazy AuditLogService auditLogService,
             CurrentUserService currentUserService,
             AppointmentMapper appointmentMapper,
-            CapacityGateway capacityGateway
+            CapacityGateway capacityGateway,
+            Clock clock
     ) {
         this.appointmentRepository = appointmentRepository;
         this.patientLookupService = patientLookupService;
@@ -65,6 +78,7 @@ public class AppointmentService {
         this.currentUserService = currentUserService;
         this.appointmentMapper = appointmentMapper;
         this.capacityGateway = capacityGateway;
+        this.clock = clock;
     }
 
     @Transactional
@@ -80,7 +94,7 @@ public class AppointmentService {
 
     @Transactional(readOnly = true)
     public List<AppointmentResponseDTO> findAppointments() {
-        if (hasAdministrativeRole()) {
+        if (hasRole(ROLE_ADMIN)) {
             return appointmentMapper.toResponseList(appointmentRepository.findAllByOrderByCreatedAtDesc());
         }
         if (hasRole(ROLE_PATIENT)) {
@@ -93,12 +107,95 @@ public class AppointmentService {
     }
 
     @Transactional(readOnly = true)
+    public List<ReceptionAppointmentSummaryDTO> findReceptionAppointments(UUID patientId, int limit) {
+        if (!hasRole(ROLE_RECEPTIONIST)) {
+            throw new AccessDeniedException("Appointment access denied");
+        }
+        if (patientId == null || limit < 1 || limit > MAX_RECEPTION_RESULTS) {
+            throw new InvalidAppointmentRequestException("patientId and a limit between 1 and 100 are required");
+        }
+        return appointmentRepository.findReceptionSummaries(patientId, limit).stream()
+                .map(this::toReceptionSummary)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReceptionWaitingRoomDTO> findReceptionWaitingRoom(int limit, int offset) {
+        if (!hasRole(ROLE_RECEPTIONIST)) {
+            throw new AccessDeniedException("Appointment access denied");
+        }
+        if (limit < 1 || limit > MAX_RECEPTION_RESULTS || offset < 0) {
+            throw new InvalidAppointmentRequestException("limit must be between 1 and 100; offset must be nonnegative");
+        }
+        return appointmentRepository.findReceptionWaitingRoom(LocalDate.now(clock.withZone(LIMA)), limit, offset)
+                .stream().map(this::toWaitingRoomEntry).toList();
+    }
+
+    private ReceptionWaitingRoomDTO toWaitingRoomEntry(ReceptionWaitingRoomRow row) {
+        return new ReceptionWaitingRoomDTO(
+                row.getAppointmentId(),
+                row.getPatientDisplay(),
+                row.getStartTime(),
+                row.getProfessionalName(),
+                row.getSpecialtyName(),
+                FlowStage.valueOf(row.getFlowStage())
+        );
+    }
+
+    private ReceptionAppointmentSummaryDTO toReceptionSummary(ReceptionAppointmentSummaryRow row) {
+        return new ReceptionAppointmentSummaryDTO(
+                row.getAppointmentId(),
+                row.getPatientId(),
+                row.getDocumentType(),
+                row.getDocumentNumber(),
+                row.getPatientName(),
+                row.getProfessionalName(),
+                row.getSpecialtyName(),
+                row.getAppointmentDate(),
+                row.getStartTime(),
+                row.getEndTime(),
+                AppointmentStatus.valueOf(row.getStatus()),
+                row.getFlowStage() == null ? null : FlowStage.valueOf(row.getFlowStage())
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<PatientAppointmentSummaryDTO> findCurrentPatientSummaries() {
+        if (!hasRole(ROLE_PATIENT)) {
+            throw new AccessDeniedException("Appointment access denied");
+        }
+        return appointmentRepository.findPatientSummaries(findCurrentPatientId()).stream()
+                .map(this::toPatientSummary)
+                .toList();
+    }
+
+    private PatientAppointmentSummaryDTO toPatientSummary(PatientAppointmentSummaryRow row) {
+        return new PatientAppointmentSummaryDTO(
+                row.getAppointmentId(),
+                AppointmentStatus.valueOf(row.getStatus()),
+                row.getFlowStage() == null ? null : FlowStage.valueOf(row.getFlowStage()),
+                row.getReason(),
+                row.getSpecialtyId(),
+                row.getSpecialtyName(),
+                row.getProfessionalId(),
+                row.getProfessionalName(),
+                row.getSlotId(),
+                row.getAppointmentDate(),
+                row.getStartTime(),
+                row.getEndTime()
+        );
+    }
+
+    @Transactional(readOnly = true)
     public AppointmentResponseDTO findAppointmentById(UUID appointmentId) {
+        if (!hasRole(ROLE_ADMIN) && !hasRole(ROLE_PATIENT)) {
+            throw new AccessDeniedException("Appointment access denied");
+        }
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new AppointmentNotFoundException(appointmentId));
 
-        if (!hasAdministrativeRole()) {
-            if (!hasRole(ROLE_PATIENT) || !appointment.getPatientId().equals(findCurrentPatientId())) {
+        if (!hasRole(ROLE_ADMIN)) {
+            if (!appointment.getPatientId().equals(findCurrentPatientId())) {
                 throw new AccessDeniedException("Appointment access denied");
             }
         }
@@ -132,6 +229,7 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponseDTO cancelAppointment(UUID appointmentId) {
+        authorizePatientOrAdmin();
         capacityGateway.lockAppointment(appointmentId);
         Appointment appointment = findAppointment(appointmentId);
         authorizeLifecycleOperation(appointment);
@@ -163,6 +261,7 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponseDTO rescheduleAppointment(UUID appointmentId, UUID newSlotId) {
+        authorizePatientOrAdmin();
         capacityGateway.lockReschedule(appointmentId, newSlotId);
         Appointment original = findAppointment(appointmentId);
         authorizeLifecycleOperation(original);
@@ -213,6 +312,11 @@ public class AppointmentService {
             return appointmentMapper.toResponse(appointment);
         }
         requireFlowState(appointment, null, "checked in");
+        LocalDate appointmentDate = appointmentRepository.findSlotDateByAppointmentId(appointmentId);
+        if (!LocalDate.now(clock.withZone(LIMA)).equals(appointmentDate)) {
+            throw new InvalidAppointmentTransitionException(
+                    appointmentId, appointment.getAppointmentStatus(), "checked in outside appointment date");
+        }
 
         AppointmentStatus previousStatus = appointment.getAppointmentStatus();
         FlowStage previousStage = appointment.getFlowStage();
@@ -284,6 +388,19 @@ public class AppointmentService {
         if (hasState(appointment, AppointmentStatus.COMPLETED, FlowStage.FINISHED)) {
             return appointmentMapper.toResponse(appointment);
         }
+        throw new InvalidAppointmentTransitionException(
+                appointmentId, appointment.getAppointmentStatus(), "completed without clinical finalization");
+    }
+
+    @Transactional
+    public AppointmentResponseDTO completeMedicalAppointment(UUID appointmentId) {
+        capacityGateway.lockAppointment(appointmentId);
+        Appointment appointment = findAppointment(appointmentId);
+        authorizeProfessionalOperation(appointment);
+
+        if (hasState(appointment, AppointmentStatus.COMPLETED, FlowStage.FINISHED)) {
+            return appointmentMapper.toResponse(appointment);
+        }
         requireFlowState(appointment, FlowStage.IN_ATTENTION, "completed");
         if (capacityGateway.isFutureSlot(appointment.getSlotId())) {
             throw new InvalidAppointmentTransitionException(
@@ -342,6 +459,12 @@ public class AppointmentService {
             return;
         }
         if (!hasRole(ROLE_PATIENT) || !appointment.getPatientId().equals(findCurrentPatientId())) {
+            throw new AccessDeniedException("Appointment access denied");
+        }
+    }
+
+    private void authorizePatientOrAdmin() {
+        if (!hasRole(ROLE_PATIENT) && !hasRole(ROLE_ADMIN)) {
             throw new AccessDeniedException("Appointment access denied");
         }
     }

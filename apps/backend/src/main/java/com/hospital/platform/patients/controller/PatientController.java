@@ -3,7 +3,9 @@ package com.hospital.platform.patients.controller;
 import com.hospital.platform.patients.dto.CreatePatientRequestDTO;
 import com.hospital.platform.patients.dto.LinkUserRequestDTO;
 import com.hospital.platform.patients.dto.PatientResponseDTO;
+import com.hospital.platform.patients.dto.ReceptionPatientSearchDTO;
 import com.hospital.platform.patients.dto.UpdatePatientRequestDTO;
+import com.hospital.platform.patients.dto.UpdatePatientDemographicsRequestDTO;
 import com.hospital.platform.patients.dto.UpdatePatientStatusRequestDTO;
 import com.hospital.platform.patients.service.PatientService;
 import jakarta.validation.Valid;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -50,6 +53,15 @@ public class PatientController {
         return patientService.findPatients();
     }
 
+    @GetMapping("/search")
+    @PreAuthorize("hasRole('RECEPTIONIST')")
+    public ResponseEntity<ReceptionPatientSearchDTO> findForReceptionByDocument(
+            @RequestParam String documentType,
+            @RequestParam String documentNumber
+    ) {
+        return ResponseEntity.of(patientService.findForReceptionByDocument(documentType, documentNumber));
+    }
+
     @GetMapping("/me")
     @PreAuthorize("hasRole('PATIENT')")
     public PatientResponseDTO findCurrentPatient() {
@@ -78,6 +90,15 @@ public class PatientController {
             @Valid @RequestBody UpdatePatientStatusRequestDTO request
     ) {
         return patientService.updateStatus(id, request);
+    }
+
+    @PatchMapping("/{id}/demographics")
+    @PreAuthorize("hasRole('ADMIN')")
+    public PatientResponseDTO updateDemographics(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdatePatientDemographicsRequestDTO request
+    ) {
+        return patientService.updateDemographics(id, request);
     }
 
     @PostMapping("/{id}/user")

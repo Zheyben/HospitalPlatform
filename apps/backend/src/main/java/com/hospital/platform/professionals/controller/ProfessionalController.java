@@ -3,6 +3,7 @@ package com.hospital.platform.professionals.controller;
 import com.hospital.platform.professionals.dto.CreateProfessionalRequestDTO;
 import com.hospital.platform.professionals.dto.ProfessionalResponseDTO;
 import com.hospital.platform.professionals.dto.UpdateProfessionalRequestDTO;
+import com.hospital.platform.professionals.dto.UpdateProfessionalStatusRequestDTO;
 import com.hospital.platform.professionals.service.ProfessionalService;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -62,5 +64,12 @@ public class ProfessionalController {
             @Valid @RequestBody UpdateProfessionalRequestDTO request
     ) {
         return professionalService.updateProfessional(id, request);
+    }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ProfessionalResponseDTO changeStatus(@PathVariable UUID id,
+            @Valid @RequestBody UpdateProfessionalStatusRequestDTO request) {
+        return professionalService.changeStatus(id, request.active());
     }
 }

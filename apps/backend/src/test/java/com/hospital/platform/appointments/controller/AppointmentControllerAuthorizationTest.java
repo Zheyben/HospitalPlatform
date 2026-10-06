@@ -10,6 +10,7 @@ import com.hospital.platform.appointments.dto.CreateAppointmentRequestDTO;
 import com.hospital.platform.appointments.dto.RescheduleAppointmentRequestDTO;
 import com.hospital.platform.appointments.entity.AppointmentStatus;
 import com.hospital.platform.appointments.service.AppointmentService;
+import com.hospital.platform.medical.service.MedicalEncounterService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -43,18 +44,24 @@ class AppointmentControllerAuthorizationTest {
     @Autowired
     private AppointmentService appointmentService;
 
+    @Autowired
+    private MedicalEncounterService medicalEncounterService;
+
     @BeforeEach
     void setUp() {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
         when(appointmentService.createAppointment(any())).thenReturn(response());
         when(appointmentService.findAppointments()).thenReturn(List.of(response()));
+        when(appointmentService.findReceptionAppointments(PATIENT_ID, 50)).thenReturn(List.of());
+        when(appointmentService.findReceptionWaitingRoom(50, 0)).thenReturn(List.of());
         when(appointmentService.findAppointmentById(APPOINTMENT_ID)).thenReturn(response());
         when(appointmentService.confirmAppointment(APPOINTMENT_ID)).thenReturn(response());
         when(appointmentService.cancelAppointment(APPOINTMENT_ID)).thenReturn(response());
         when(appointmentService.rescheduleAppointment(APPOINTMENT_ID, NEW_SLOT_ID)).thenReturn(response());
         when(appointmentService.checkInAppointment(APPOINTMENT_ID)).thenReturn(response());
         when(appointmentService.moveAppointmentToWaiting(APPOINTMENT_ID)).thenReturn(response());
-        when(appointmentService.startAppointmentAttention(APPOINTMENT_ID)).thenReturn(response());
+        when(medicalEncounterService.start(APPOINTMENT_ID))
+                .thenReturn(new MedicalEncounterService.StartResult(null, response()));
         when(appointmentService.completeAppointment(APPOINTMENT_ID)).thenReturn(response());
     }
 
@@ -79,7 +86,23 @@ class AppointmentControllerAuthorizationTest {
     @Test
     @WithMockUser(roles = "RECEPTIONIST")
     void allowsReceptionistRole() {
-        assertEveryEndpointIsAllowed(new CreateAppointmentRequestDTO(SLOT_ID, PATIENT_ID, "Control"));
+        assertThatCode(() -> appointmentController.createAppointment(
+                new CreateAppointmentRequestDTO(SLOT_ID, PATIENT_ID, "Control")))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> appointmentController.findReceptionAppointments(PATIENT_ID, 50))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> appointmentController.findReceptionWaitingRoom(50, 0))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> appointmentController.findAppointments())
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> appointmentController.findAppointmentById(APPOINTMENT_ID))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatCode(() -> appointmentController.confirmAppointment(APPOINTMENT_ID)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> appointmentController.cancelAppointment(APPOINTMENT_ID))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> appointmentController.rescheduleAppointment(
+                APPOINTMENT_ID, new RescheduleAppointmentRequestDTO(NEW_SLOT_ID)))
+                .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
@@ -90,6 +113,10 @@ class AppointmentControllerAuthorizationTest {
         assertThatThrownBy(() -> appointmentController.createAppointment(request))
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> appointmentController.findAppointments())
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> appointmentController.findReceptionAppointments(PATIENT_ID, 50))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> appointmentController.findReceptionWaitingRoom(50, 0))
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> appointmentController.findAppointmentById(APPOINTMENT_ID))
                 .isInstanceOf(AccessDeniedException.class);
@@ -128,12 +155,20 @@ class AppointmentControllerAuthorizationTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void rejectsAdminFromAllOperationalEndpoints() {
+        assertThatThrownBy(() -> appointmentController.findReceptionAppointments(PATIENT_ID, 50))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> appointmentController.findReceptionWaitingRoom(50, 0))
+                .isInstanceOf(AccessDeniedException.class);
         assertEveryOperationalEndpointIsDenied();
     }
 
     @Test
     @WithMockUser(roles = "PATIENT")
     void rejectsPatientFromAllOperationalEndpoints() {
+        assertThatThrownBy(() -> appointmentController.findReceptionAppointments(PATIENT_ID, 50))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> appointmentController.findReceptionWaitingRoom(50, 0))
+                .isInstanceOf(AccessDeniedException.class);
         assertEveryOperationalEndpointIsDenied();
     }
 
@@ -188,8 +223,14 @@ class AppointmentControllerAuthorizationTest {
         }
 
         @Bean
-        AppointmentController appointmentController(AppointmentService appointmentService) {
-            return new AppointmentController(appointmentService);
+        MedicalEncounterService medicalEncounterService() {
+            return Mockito.mock(MedicalEncounterService.class);
+        }
+
+        @Bean
+        AppointmentController appointmentController(AppointmentService appointmentService,
+                                                     MedicalEncounterService medicalEncounterService) {
+            return new AppointmentController(appointmentService, medicalEncounterService);
         }
     }
 }

@@ -5,6 +5,8 @@ import com.hospital.platform.auth.dto.AuthErrorResponseDTO;
 import com.hospital.platform.security.exception.JwtConfigurationException;
 import com.hospital.platform.patients.exception.DuplicateDocumentException;
 import com.hospital.platform.patients.exception.InvalidDocumentException;
+import com.hospital.platform.patients.domain.InvalidPatientDemographicsException;
+import com.hospital.platform.patients.service.InvalidInsuranceException;
 import com.hospital.platform.users.exception.DuplicateEmailException;
 import com.hospital.platform.users.exception.RoleNotFoundException;
 import java.time.Instant;
@@ -34,6 +36,16 @@ public class AuthExceptionHandler {
     @ExceptionHandler(InvalidDocumentException.class)
     ResponseEntity<AuthErrorResponseDTO> handleInvalidDocument(InvalidDocumentException exception) {
         return error(HttpStatus.BAD_REQUEST, "Document type or number is invalid", "VALIDATION_ERROR");
+    }
+
+    @ExceptionHandler(InvalidInsuranceException.class)
+    ResponseEntity<AuthErrorResponseDTO> handleInvalidInsurance(InvalidInsuranceException exception) {
+        return error(HttpStatus.BAD_REQUEST, "Insurance selection is invalid", "VALIDATION_ERROR");
+    }
+
+    @ExceptionHandler(InvalidPatientDemographicsException.class)
+    ResponseEntity<AuthErrorResponseDTO> handleInvalidDemographics(InvalidPatientDemographicsException exception) {
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), "VALIDATION_ERROR");
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})

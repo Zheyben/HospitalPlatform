@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.hospital.platform.patients.dto.PatientResponseDTO;
+import com.hospital.platform.patients.dto.UpdatePatientDemographicsRequestDTO;
 import com.hospital.platform.patients.service.PatientService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,8 @@ class PatientControllerAuthorizationTest {
     @Test
     @WithMockUser(roles = "PATIENT")
     void allowsPatientToReadOwnProfile() {
-        PatientResponseDTO response = new PatientResponseDTO(null, null, "DNI", "12345678", null, null, null, null, true);
+        PatientResponseDTO response = new PatientResponseDTO(
+                null, null, "DNI", "12345678", null, null, null, null, null, true);
         when(patientService.findCurrentPatient()).thenReturn(response);
 
         assertThat(patientController.findCurrentPatient()).isSameAs(response);
@@ -49,6 +51,10 @@ class PatientControllerAuthorizationTest {
         assertThatThrownBy(() -> patientController.findPatients())
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> patientController.findCurrentPatient())
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> patientController.updateDemographics(null,
+                new UpdatePatientDemographicsRequestDTO(null, null, null, null,
+                        null, null, null, null)))
                 .isInstanceOf(AccessDeniedException.class);
     }
 

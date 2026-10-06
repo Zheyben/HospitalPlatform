@@ -2,8 +2,12 @@ package com.hospital.platform.appointments.controller;
 
 import com.hospital.platform.appointments.dto.AppointmentResponseDTO;
 import com.hospital.platform.appointments.dto.CreateAppointmentRequestDTO;
+import com.hospital.platform.appointments.dto.PatientAppointmentSummaryDTO;
+import com.hospital.platform.appointments.dto.ReceptionAppointmentSummaryDTO;
+import com.hospital.platform.appointments.dto.ReceptionWaitingRoomDTO;
 import com.hospital.platform.appointments.dto.RescheduleAppointmentRequestDTO;
 import com.hospital.platform.appointments.service.AppointmentService;
+import com.hospital.platform.medical.service.MedicalEncounterService;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -15,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -23,9 +28,11 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class AppointmentController {
 
     private final AppointmentService appointmentService;
+    private final MedicalEncounterService medicalEncounterService;
 
-    public AppointmentController(AppointmentService appointmentService) {
+    public AppointmentController(AppointmentService appointmentService, MedicalEncounterService medicalEncounterService) {
         this.appointmentService = appointmentService;
+        this.medicalEncounterService = medicalEncounterService;
     }
 
     @PostMapping
@@ -42,13 +49,37 @@ public class AppointmentController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('PATIENT', 'ADMIN', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('PATIENT', 'ADMIN')")
     public List<AppointmentResponseDTO> findAppointments() {
         return appointmentService.findAppointments();
     }
 
+    @GetMapping("/reception")
+    @PreAuthorize("hasRole('RECEPTIONIST')")
+    public List<ReceptionAppointmentSummaryDTO> findReceptionAppointments(
+            @RequestParam UUID patientId,
+            @RequestParam(defaultValue = "50") int limit
+    ) {
+        return appointmentService.findReceptionAppointments(patientId, limit);
+    }
+
+    @GetMapping("/reception/waiting-room")
+    @PreAuthorize("hasRole('RECEPTIONIST')")
+    public List<ReceptionWaitingRoomDTO> findReceptionWaitingRoom(
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "0") int offset
+    ) {
+        return appointmentService.findReceptionWaitingRoom(limit, offset);
+    }
+
+    @GetMapping("/me/summary")
+    @PreAuthorize("hasRole('PATIENT')")
+    public List<PatientAppointmentSummaryDTO> findCurrentPatientSummaries() {
+        return appointmentService.findCurrentPatientSummaries();
+    }
+
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('PATIENT', 'ADMIN', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('PATIENT', 'ADMIN')")
     public AppointmentResponseDTO findAppointmentById(@PathVariable UUID id) {
         return appointmentService.findAppointmentById(id);
     }
@@ -60,13 +91,13 @@ public class AppointmentController {
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyRole('PATIENT', 'ADMIN', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('PATIENT', 'ADMIN')")
     public AppointmentResponseDTO cancelAppointment(@PathVariable UUID id) {
         return appointmentService.cancelAppointment(id);
     }
 
     @PostMapping("/{id}/reschedule")
-    @PreAuthorize("hasAnyRole('PATIENT', 'ADMIN', 'RECEPTIONIST')")
+    @PreAuthorize("hasAnyRole('PATIENT', 'ADMIN')")
     public ResponseEntity<AppointmentResponseDTO> rescheduleAppointment(
             @PathVariable UUID id,
             @Valid @RequestBody RescheduleAppointmentRequestDTO request
@@ -94,7 +125,7 @@ public class AppointmentController {
     @PostMapping("/{id}/start-attention")
     @PreAuthorize("hasRole('PROFESSIONAL')")
     public AppointmentResponseDTO startAppointmentAttention(@PathVariable UUID id) {
-        return appointmentService.startAppointmentAttention(id);
+        return medicalEncounterService.start(id).appointment();
     }
 
     @PostMapping("/{id}/complete")

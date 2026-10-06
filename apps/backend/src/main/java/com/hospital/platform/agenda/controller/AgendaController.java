@@ -1,6 +1,7 @@
 package com.hospital.platform.agenda.controller;
 
 import com.hospital.platform.agenda.dto.AgendaResponseDTO;
+import com.hospital.platform.agenda.dto.AgendaPublicationResponseDTO;
 import com.hospital.platform.agenda.dto.AvailabilitySlotResponseDTO;
 import com.hospital.platform.agenda.dto.CreateAgendaRequestDTO;
 import com.hospital.platform.agenda.dto.UpdateAgendaRequestDTO;
@@ -80,6 +81,12 @@ public class AgendaController {
         return agendaService.changeAgendaStatus(id, request.active());
     }
 
+    @PostMapping("/agendas/{id}/publish")
+    @PreAuthorize("hasRole('ADMIN')")
+    public AgendaPublicationResponseDTO publishAgenda(@PathVariable UUID id) {
+        return agendaService.publishAgenda(id);
+    }
+
     @GetMapping("/availability")
     @PreAuthorize("hasAnyRole('ADMIN', 'PATIENT')")
     public List<AvailabilitySlotResponseDTO> findAvailability(
@@ -90,6 +97,17 @@ public class AgendaController {
             @RequestParam(required = false) AvailabilitySlotStatus status
     ) {
         return agendaService.findAvailability(scheduleId, professionalId, slotDate, status);
+    }
+
+    @GetMapping("/reception/availability")
+    @PreAuthorize("hasRole('RECEPTIONIST')")
+    public List<AvailabilitySlotResponseDTO> findReceptionAvailability(
+            @RequestParam(required = false) UUID scheduleId,
+            @RequestParam(required = false) UUID professionalId,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate slotDate
+    ) {
+        return agendaService.findReceptionAvailability(scheduleId, professionalId, slotDate);
     }
 
     @GetMapping("/availability/{id}")

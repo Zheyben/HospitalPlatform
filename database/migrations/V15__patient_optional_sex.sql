@@ -1,0 +1,2 @@
+ALTER TABLE patients
+    ADD COLUMN sex VARCHAR(50);
